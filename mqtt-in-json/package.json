@@ -1,0 +1,22 @@
+{
+  "name": "@ashish-y/node-red-node-mqtt-in-json",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "ashish yadav",
+  "license": "ISC",
+  "node-red": {
+    "nodes": {
+      "mqtt-in-json": "mqtt-in-json.js"
+    }
+  },
+  "dependencies": {
+    "is-utf8": "^0.2.1"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  }
+}
