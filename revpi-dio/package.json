@@ -1,0 +1,19 @@
+{
+  "name": "@ashish-y/node-red-node-revpi-dio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "ashish yadav",
+  "license": "ISC",
+  "node-red": {
+    "nodes": {
+      "revpi-dio": "revpi-dio.js"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  }
+}
