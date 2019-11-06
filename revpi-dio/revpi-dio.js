@@ -37,7 +37,7 @@ module.exports = function(RED) {
         node.status({ fill: "green", shape: "dot", text: "common.status.ok" });
 
         node.child.stdout.on("data", function(data) {
-          console.log(data);
+          node.send({ payload: data.toString() });
           // var d = data.toString().trim().split("\n");
           // for (var i = 0; i < d.length; i++) {
           //     if (d[i] === '') { return; }

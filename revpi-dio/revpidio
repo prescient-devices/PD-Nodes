@@ -14,4 +14,4 @@
 #
 
 BASEDIR=$(dirname $0)
-python -u $BASEDIR/revpidio.py $@
+python3 -u $BASEDIR/revpidio.py $@
