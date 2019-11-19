@@ -18,6 +18,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "ssh://git@github.com:ashish-y/PD-Nodes.git"
+    "url": "ssh://git@github.com:prescient-devices/PD-Nodes.git"
   }
 }
