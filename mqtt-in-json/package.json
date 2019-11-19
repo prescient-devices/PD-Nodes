@@ -1,5 +1,5 @@
 {
-  "name": "@ashish-y/node-red-node-mqtt-in-json",
+  "name": "@prescient-devices/node-red-node-mqtt-in-json",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
