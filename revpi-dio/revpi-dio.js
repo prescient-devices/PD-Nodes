@@ -32,8 +32,6 @@ module.exports = function(RED) {
     if (allOK === true) {
       if (this.pinname !== undefined) {
         node.child = spawn(revpidioCommand, ["in", this.pinname]);
-        console.log("Input Pin");
-        console.log(this.pinname);
         node.running = true;
         node.status({ fill: "green", shape: "dot", text: "common.status.ok" });
         node.child.stdout.on("data", function(data) {
@@ -88,80 +86,81 @@ module.exports = function(RED) {
     RED.nodes.createNode(this, config);
     this.name = config.name;
     this.pinname = config.pinname;
-    this.pinvalue = config.pinvalue;
-    console.log(config);
-    console.log(this);
-    console.log(this.pinname);
     var node = this;
-    if (allOK === true) {
-      if (this.pinname !== undefined) {
-        node.child = spawn(revpidioCommand, [
-          "out",
-          this.pinname,
-          this.pinvalue
-        ]);
-        node.running = true;
-        node.status({ fill: "green", shape: "dot", text: "common.status.ok" });
 
-        node.child.stdout.on("data", function(data) {
-          node.send({ payload: data.toString() });
-          // var d = data.toString().trim().split("\n");
-          // for (var i = 0; i < d.length; i++) {
-          //     if (d[i] === '') { return; }
-          //     if (node.running && node.buttonState !== -1 && !isNaN(Number(d[i])) && node.buttonState !== d[i]) {
-          //         node.send({ topic:"pi/"+node.pin, payload:Number(d[i]) });
-          //     }
-          //     node.buttonState = d[i];
-          //     node.status({fill:"green",shape:"dot",text:d[i]});
-          //     if (RED.settings.verbose) { node.log("out: "+d[i]+" :"); }
-          // }
-        });
+    function inputlistener(msg) {
+      if (msg.payload === "true") {
+        msg.payload = true;
+      }
+      if (msg.payload === "false") {
+        msg.payload = false;
+      }
+      var out = Number(msg.payload);
+      var limit = 1;
 
-        node.child.stderr.on("data", function(data) {
-          if (RED.settings.verbose) {
-            node.log("err: " + data + " :");
-          }
-        });
-
-        node.child.on("close", function(code) {
-          node.running = false;
-          node.child = null;
-          if (RED.settings.verbose) {
-            node.log(RED._("revpi-dio.status.closed"));
-          }
-          if (node.done) {
+      if (out >= 0 && out <= limit) {
+        if (allOK === true) {
+          if (this.pinname !== undefined) {
+            node.child = spawn(revpidioCommand, ["out", this.pinname, out]);
+            node.running = true;
             node.status({
-              fill: "grey",
-              shape: "ring",
-              text: "revpi-dio.status.closed"
+              fill: "green",
+              shape: "dot",
+              text: "common.status.ok"
             });
-            node.done();
-          } else {
-            node.status({
-              fill: "red",
-              shape: "ring",
-              text: "revpi-dio.status.stopped"
-            });
-          }
-        });
 
-        node.child.on("error", function(err) {
-          if (err.errno === "ENOENT") {
-            node.error(RED._("revpi-dio.errors.commandnotfound"));
-          } else if (err.errno === "EACCES") {
-            node.error(RED._("revpi-dio.errors.commandnotexecutable"));
+            node.child.stdout.on("data", function(data) {
+              node.send({ payload: data.toString() });
+            });
+
+            node.child.stderr.on("data", function(data) {
+              if (RED.settings.verbose) {
+                node.log("err: " + data + " :");
+              }
+            });
+
+            node.child.on("close", function(code) {
+              node.running = false;
+              node.child = null;
+              if (RED.settings.verbose) {
+                node.log(RED._("revpi-dio.status.closed"));
+              }
+              if (node.done) {
+                node.status({
+                  fill: "grey",
+                  shape: "ring",
+                  text: "revpi-dio.status.closed"
+                });
+                node.done();
+              } else {
+                node.status({
+                  fill: "red",
+                  shape: "ring",
+                  text: "revpi-dio.status.stopped"
+                });
+              }
+            });
+
+            node.child.on("error", function(err) {
+              if (err.errno === "ENOENT") {
+                node.error(RED._("revpi-dio.errors.commandnotfound"));
+              } else if (err.errno === "EACCES") {
+                node.error(RED._("revpi-dio.errors.commandnotexecutable"));
+              } else {
+                node.error(
+                  RED._("revpi-dio.errors.error", { error: err.errno })
+                );
+              }
+            });
           } else {
-            node.error(RED._("revpi-dio.errors.error", { error: err.errno }));
+            node.warn(
+              RED._("revpi-dio.errors.invalidpin") + ": " + this.pinname
+            );
           }
-        });
-      } else {
-        node.warn(RED._("revpi-dio.errors.invalidpin") + ": " + this.pinname);
+        }
       }
     }
-    // this.on("input", function(msg) {
-    //   msg.payload = this.pinname;
-    //   node.send(msg);
-    // });
+    node.on("input", inputlistener);
   }
   RED.nodes.registerType("revpi-dio out", RevPiDIOOUT);
 };

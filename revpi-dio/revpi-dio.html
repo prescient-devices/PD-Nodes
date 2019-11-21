@@ -48,8 +48,7 @@
     color: "#E6E0F8",
     defaults: {
       name: { value: "" },
-      pinname: { value: "", required: true },
-      pinvalue: { value: "msg.payload", required: true }
+      pinname: { value: "", required: true }
     },
     inputs: 1,
     outputs: 0,
@@ -61,16 +60,13 @@
 </script>
 
 <script type="text/x-red" data-template-name="revpi-dio out">
-   <div class="form-row">
-       <label for="node-output-name"><i class="icon-tag"></i> Name </label>
-       <input type="text" id="node-input-name" placeholder="Name">
+  <div class="form-row">
+      <label for="node-output-name"><i class="icon-tag"></i> Name </label>
+      <input type="text" id="node-input-name" placeholder="Name">
 
-       <label for="node-input-pinname"><i class="icon-tag"></i>Output Pin</label>
-       <input type="text" id="node-input-pinname" placeholder="Output Pin">
-
-  <label for="node-input-pinvalue"><i class="icon-tag"></i>Value</label>
-       <input type="text" id="node-input-pinvalue" placeholder="Value">
-   </div>
+      <label for="node-input-pinname"><i class="icon-tag"></i>Output Pin</label>
+      <input type="text" id="node-input-pinname" placeholder="Output Pin">
+  </div>
 </script>
 
 <script type="text/x-red" data-help-name="revpi-dio out">

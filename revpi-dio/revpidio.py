@@ -4,28 +4,27 @@ def eventfunction(ioname, iovalue):
         #print("Event {} has the value of {}".format(ioname,iovalue))
        print(iovalue)
 
-try:
-    raw_input          # Python 2
-except NameError:
-    raw_input = input  # Python 3
-
 if len(sys.argv) > 2:
-    cmd = sys.argv[1].lower()
+    cmd = sys.argv[1]
     pin_input = sys.argv[2]
-    if cmd == "in":
-        rpi = revpimodio2.RevPiModIO(autorefresh=True,direct_output=True)
-        rpi.handlesignalend()
-        print(rpi.io[pin_input].value)
-        #rpi.io[pin_input].reg_event(eventfunction)
-        #print("Starting main loop")
-        rpi.mainloop()
+    if cmd=="in":
+        rpi_in = revpimodio2.RevPiModIO(autorefresh=True,direct_output=True)
+        rpi_in.handlesignalend()
+        #rpi.mainloop()
+        rpi_in.io[pin_input].reg_event(eventfunction)
+        #print(rpi.io[pin_input].value)
+        rpi_in.mainloop()
+    if cmd=="out":
+        output_value = sys.argv[3]
+        # rpi_out = revpimodio2.RevPiModIO(autorefresh=True,direct_output=True)
+        # rpi_out.handlesignalend()
+        rpi_out = revpimodio2.RevPiModIO(autorefresh=True,direct_output=True)
+        rpi_out.io.O_2.value=int(output_value)
+        # rpi_out.mainloop()
+        print(int(output_value))
+    else:
+        print("cmd not found-something is missing!")
 
-        while True:
-            try:
-                data = raw_input()
-                if 'close' in data:
-                    sys.exit(0)
-            except (EOFError, SystemExit):        # hopefully always caused by us sigint'ing the program
-                sys.exit(0)
 else:
     print("Bad parameters - input_pin")
+
