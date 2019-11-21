@@ -4,13 +4,9 @@ RevPiDIO is a node-red node for reading/writing RevPiDIO Input Ouputs.
 
 ### Prerequisites
 
-Python3
+[Python3](https://www.python.org/)
 
-https://revpimodio.org/en/sources/sources2/
-
-```
-sudo apt-get install python3-revpimodio2
-```
+[revpimodio2](https://revpimodio.org/en/sources/sources2/)
 
 ### Installation
 
@@ -18,7 +14,9 @@ sudo apt-get install python3-revpimodio2
 npm i @prescient-devices/node-red-node-revpi-dio
 ```
 
-[Node-Red Pallet Manager](https://nodered.org/docs/user-guide/editor/palette/manager)
+OR
+
+[Node-Red Palette Manager](https://nodered.org/docs/user-guide/editor/palette/manager)
 
 ## Contributing
 
