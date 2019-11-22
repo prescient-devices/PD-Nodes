@@ -1,6 +1,6 @@
 {
-  "name": "@prescient-devices/node-red-node-revpi-dio",
-  "version": "1.1.0",
+  "name": "@prescient-devices/node-red-contrib-revpi-dio",
+  "version": "1.0.0",
   "description": "Node-Red-Node to read write revpi DIO using revpimoio2",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,9 @@
       "revpi-dio": "revpi-dio.js"
     }
   },
+  "keywords": [
+    "node-red"
+  ],
   "publishConfig": {
     "access": "public"
   },
