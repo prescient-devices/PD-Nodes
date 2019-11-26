@@ -21,8 +21,10 @@ module.exports = function(RED) {
   var fs = require("fs");
   var revpidioCommand = __dirname + "/revpidio";
   var allOK = true;
+  //Validation here---
 
-  //check for errors here
+  // the magic to make python print stuff immediately
+  process.env.PYTHONUNBUFFERED = 1;
 
   function RevPiDIOIN(config) {
     RED.nodes.createNode(this, config);
@@ -47,6 +49,7 @@ module.exports = function(RED) {
         node.child.on("close", function(code) {
           node.running = false;
           node.child = null;
+
           if (RED.settings.verbose) {
             node.log(RED._("revpi-dio.status.closed"));
           }
@@ -79,6 +82,20 @@ module.exports = function(RED) {
         node.warn(RED._("revpi-dio.errors.invalidpin") + ": " + this.pinname);
       }
     }
+    node.on("close", function(done) {
+      node.status({
+        fill: "grey",
+        shape: "ring",
+        text: "rpi-gpio.status.closed"
+      });
+      if (node.child != null) {
+        node.done = done;
+        node.child.stdin.write("close " + this.pinname);
+        node.child.kill("SIGKILL");
+      } else {
+        done();
+      }
+    });
   }
   RED.nodes.registerType("revpi-dio in", RevPiDIOIN);
 
