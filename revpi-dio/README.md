@@ -11,7 +11,7 @@ RevPiDIO is a node-red node for reading/writing RevPiDIO Input Ouputs.
 ### Installation
 
 ```
-npm i @prescient-devices/node-red-node-revpi-dio
+npm i @prescient-devices/node-red-contrib-revpi-dio
 ```
 
 OR
