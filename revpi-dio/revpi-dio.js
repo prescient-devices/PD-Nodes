@@ -37,7 +37,21 @@ module.exports = function(RED) {
         node.running = true;
         node.status({ fill: "green", shape: "dot", text: "common.status.ok" });
         node.child.stdout.on("data", function(data) {
-          node.send({ payload: data.toString() });
+          if (
+            data
+              .toString()
+              .trim()
+              .split("\n")[0] == "True"
+          ) {
+            node.send({ payload: true });
+          } else if (
+            data
+              .toString()
+              .trim()
+              .split("\n") == "False"
+          ) {
+            node.send({ payload: false });
+          }
         });
 
         node.child.stderr.on("data", function(data) {
@@ -127,7 +141,21 @@ module.exports = function(RED) {
             });
 
             node.child.stdout.on("data", function(data) {
-              node.send({ payload: data.toString() });
+              if (
+                data
+                  .toString()
+                  .trim()
+                  .split("\n")[0] == "True"
+              ) {
+                node.send({ payload: true });
+              } else if (
+                data
+                  .toString()
+                  .trim()
+                  .split("\n") == "False"
+              ) {
+                node.send({ payload: false });
+              }
             });
 
             node.child.stderr.on("data", function(data) {
