@@ -86,7 +86,7 @@ module.exports = function (RED) {
         shape: "ring",
         text: "rpi-gpio.status.closed"
       });
-      if (node.child != null) {
+      if (node.child !== null) {
         node.done = done;
         node.child.stdin.write("close " + this.pinname);
         node.child.kill("SIGKILL");
@@ -129,14 +129,14 @@ module.exports = function (RED) {
                 data
                   .toString()
                   .trim()
-                  .split("\n")[0] == "True"
+                  .split("\n")[0] === "True"
               ) {
                 node.send({ payload: true });
               } else if (
                 data
                   .toString()
                   .trim()
-                  .split("\n") == "False"
+                  .split("\n") === "False"
               ) {
                 node.send({ payload: false });
               }
