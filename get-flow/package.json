@@ -1,7 +1,7 @@
 {
-  "name": "@prescient-devices/node-red-contrib-revpi-dio",
-  "version": "2.0.0",
-  "description": "Node-Red-Node to read write revpi DIO using revpimoio2",
+  "name": "@prescient-devices/node-red-contrib-get-flow",
+  "version": "0.0.9",
+  "description": "Node-Red-Node to get flow file from home folder",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,7 +10,7 @@
   "license": "ISC",
   "node-red": {
     "nodes": {
-      "revpi-dio": "revpi-dio.js"
+      "get-flow": "get-flow.js"
     }
   },
   "keywords": [
