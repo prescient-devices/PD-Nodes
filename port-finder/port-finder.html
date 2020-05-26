@@ -1,0 +1,20 @@
+<!--
+  Copyright 2020 Prescient Devices, Inc.
+-->
+<script type="text/javascript">
+    RED.nodes.registerType('port-finder',{
+        category: 'function',
+        color: '#fdd0a2',
+        defaults: { },
+        inputs:1,
+        outputs:1,
+        icon: "light.svg",
+        label: function() {
+            return this.name||"port-finder";
+        }
+    });
+</script>
+
+<script type="text/html" data-help-name="port-finder">
+    <p>Returns port Node Red is listening to</p>
+</script>
