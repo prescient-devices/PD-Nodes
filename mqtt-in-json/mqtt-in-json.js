@@ -23,7 +23,8 @@ module.exports = function (RED) {
         shape: "ring",
         text: "node-red:common.status.disconnected"
       });
-      if (this.topic) {
+      if (this.topic.trim()) {
+        this.topic = this.topic.trim();
         node.brokerConn.register(this);
         this.brokerConn.subscribe(
           this.topic,
@@ -59,8 +60,6 @@ module.exports = function (RED) {
             text: "node-red:common.status.connected"
           });
         }
-      } else {
-        this.error(RED._("mqtt.errors.not-defined"));
       }
       this.on("close", function (done) {
         if (node.brokerConn) {
