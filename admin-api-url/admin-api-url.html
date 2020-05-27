@@ -2,19 +2,19 @@
   Copyright 2020 Prescient Devices, Inc.
 -->
 <script type="text/javascript">
-    RED.nodes.registerType('port-finder',{
-        category: 'function',
+    RED.nodes.registerType('admin-api-url',{
+        category: 'pdlib',
         color: '#fdd0a2',
         defaults: { },
         inputs:1,
         outputs:1,
         icon: "light.svg",
         label: function() {
-            return this.name||"port-finder";
+            return this.name||"admin-api-url";
         }
     });
 </script>
 
-<script type="text/html" data-help-name="port-finder">
+<script type="text/html" data-help-name="admin-api-url">
     <p>Returns port Node Red is listening to</p>
 </script>

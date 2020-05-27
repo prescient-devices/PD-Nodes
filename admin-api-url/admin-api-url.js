@@ -3,13 +3,13 @@
  **/
 
 module.exports = function(RED) {
-  function PortFinder(config) {
+  function AdminApiUrl(config) {
       RED.nodes.createNode(this,config);
       var node = this;
       node.on('input', function(msg) {
-          msg.url = "localhost:"+RED.settings.uiPort+"/flows";
+          msg.url = "localhost:"+RED.settings.uiPort;
           node.send(msg);
       });
   }
-  RED.nodes.registerType("port-finder",PortFinder);
+  RED.nodes.registerType("admin-api-url",AdminApiUrl);
 };

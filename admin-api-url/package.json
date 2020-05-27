@@ -1,7 +1,7 @@
 {
-  "name": "@prescient-devices/node-red-node-port-finder",
+  "name": "@prescient-devices/node-red-contrib-admin-api-url",
   "version": "1.0.0",
-  "description": "Finds port Node Red is listening to",
+  "description": "Finds Node Red administrator API URL",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -10,7 +10,7 @@
   "license": "ISC",
   "node-red": {
     "nodes": {
-      "port-finder": "port-finder.js"
+      "port-finder": "admin-api-url.js"
     }
   },
   "keywords": [
