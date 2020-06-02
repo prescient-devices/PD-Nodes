@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-admin-api-url",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Finds Node Red administrator API URL",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,7 @@
   "license": "ISC",
   "node-red": {
     "nodes": {
-      "port-finder": "admin-api-url.js"
+      "admin-api-url": "admin-api-url.js"
     }
   },
   "keywords": [
