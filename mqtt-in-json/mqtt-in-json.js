@@ -1,16 +1,17 @@
-module.exports = function (RED) {
+module.exports = function(RED) {
   "use strict";
   var isUtf8 = require("is-utf8");
 
   function MQTTInJSONNode(n) {
     RED.nodes.createNode(this, n);
-    this.topic = n.topic;
+    this.topic = n.topic.trim();
     this.qos = parseInt(n.qos);
     if (isNaN(this.qos) || this.qos < 0 || this.qos > 2) {
       this.qos = 2;
     }
     this.broker = n.broker;
     this.brokerConn = RED.nodes.getNode(this.broker);
+    this.ignoreEmpty = n.ignoreempty;
     if (
       !/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/.test(this.topic)
     ) {
@@ -23,13 +24,12 @@ module.exports = function (RED) {
         shape: "ring",
         text: "node-red:common.status.disconnected"
       });
-      if (this.topic.trim()) {
-        this.topic = this.topic.trim();
+      if (this.topic) {
         node.brokerConn.register(this);
         this.brokerConn.subscribe(
           this.topic,
           this.qos,
-          function (topic, payload, packet) {
+          function(topic, payload, packet) {
             if (isUtf8(payload)) {
               try {
                 payload = JSON.parse(payload.toString());
@@ -60,8 +60,10 @@ module.exports = function (RED) {
             text: "node-red:common.status.connected"
           });
         }
+      } else if (!this.ignoreEmpty) {
+        this.error(RED._("mqtt.errors.not-defined"));
       }
-      this.on("close", function (done) {
+      this.on("close", function(done) {
         if (node.brokerConn) {
           node.brokerConn.unsubscribe(node.topic, node.id);
           node.brokerConn.deregister(node, done);

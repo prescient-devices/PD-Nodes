@@ -19,6 +19,9 @@
       <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name"></span></label>
       <input type="text" id="node-input-name" data-i18n="[placeholder]common.label.name">
   </div>
+  <div class="form-row">
+      <input type="checkbox" id="node-input-ignoreempty" style="display:inline-block; width:22px; vertical-align:baseline;"><span data-i18n="mqtt.label.ignore-empty-topic"></span>
+  </div>
 </script>
 
 <script type="text/x-red" data-help-name="mqtt in JSON">
@@ -55,6 +58,7 @@
       },
       qos: { value: "2" },
       broker: { type: "mqtt-broker", required: true },
+      ignoreempty: { value: true },
     },
     color: "#d8bfd8",
     inputs: 0,
