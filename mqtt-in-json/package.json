@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-node-mqtt-in-json",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "mqtt in json",
   "main": "index.js",
   "scripts": {
@@ -16,7 +16,7 @@
   "license": "ISC",
   "node-red": {
     "nodes": {
-      "mqtt-in-json": "mqtt-in-json.js"
+      "mqtt in JSON": "mqtt-in-json.js"
     }
   },
   "dependencies": {
