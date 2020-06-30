@@ -1,7 +1,7 @@
 @prescient-devices/node-red-contrib-admin-api-url
 =================================================
 
-This module add a `url` method the the message with the local HTTP
+This module adds a `url` method the the message with the local HTTP
 administrator API URL
 
 Copyright 2020 Prescient Devices, Inc.
