@@ -1,20 +1,20 @@
 {
   "name": "@prescient-devices/node-red-contrib-admin-api-url",
-  "version": "1.0.1",
-  "description": "Finds Node Red administrator API URL",
+  "version": "1.0.2",
+  "description": "Finds Node-Red administrator API URL",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Pablo Acosta-Serafini",
-  "license": "ISC",
+  "license": "MIT",
   "node-red": {
     "nodes": {
       "admin-api-url": "admin-api-url.js"
     }
   },
   "keywords": [
-      "node-red"
+    "node-red"
   ],
   "publishConfig": {
     "access": "public"
