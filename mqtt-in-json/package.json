@@ -1,7 +1,7 @@
 {
   "name": "@prescient-devices/node-red-node-mqtt-in-json",
-  "version": "1.1.1",
-  "description": "mqtt in json",
+  "version": "1.1.2",
+  "description": "MQTT block that parses the received JSON payload",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -22,6 +22,9 @@
   "dependencies": {
     "is-utf8": "^0.2.1"
   },
+  "keywords": [
+    "node-red"
+  ],
   "publishConfig": {
     "access": "public"
   },
