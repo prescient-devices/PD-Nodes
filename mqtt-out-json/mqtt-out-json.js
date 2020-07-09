@@ -41,14 +41,6 @@ module.exports = function (RED) {
           ) {
             // topic must exist
             if (this.wholeMsg) {
-              //var skipList = ["_msgid", "qos", "retain", "topic", "payload"]
-              //var payload = {}
-              //for (var prop of Object.keys(msg).filter(
-              //  (item) => !skipList.includes(item)
-              //)) {
-              //  payload[prop] = msg[prop]
-              //}
-              //payload.__payload = clone(msg.payload)
               var skipList = ["_msgid", "qos", "retain", "topic"]
               var payload = clone(msg)
               payload._wholeMsg = this.wholeMsg
