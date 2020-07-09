@@ -1,7 +1,10 @@
 @prescient-devices/node-red-node-mqtt-in-json
 =============================================
 
-MQTT block that parses the received JSON payload
+MQTT input node that JSON-parses payload possible, and optionally ignores empty
+topics.  Paired with
+[@prescient-devices/node-red-node-mqtt-out-json](https://flows.nodered.org/node/@prescient-devices/node-red-node-mqtt-out-json)
+it is able to receive a whole message, not just the payload.
 
 Copyright 2020 Prescient Devices, Inc.
 
