@@ -1,0 +1,33 @@
+{
+  "name": "@prescient-devices/node-red-node-mqtt-out-json",
+  "version": "1.0.0",
+  "description": "MQTT node that optionally transmits the whole message object, and/or ignores empty topics",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": {
+    "name": "Pablo Acosta-Serafini",
+    "email": "pablo.acosta@prescientdevices.com"
+  },
+  "license": "ISC",
+  "node-red": {
+    "nodes": {
+      "mqtt out JSON": "mqtt-out-json.js"
+    }
+  },
+  "dependencies": {
+    "clone": "^2.1.2",
+    "is-utf8": "^0.2.1"
+  },
+  "keywords": [
+    "node-red"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com:prescient-devices/PD-Nodes.git"
+  }
+}
