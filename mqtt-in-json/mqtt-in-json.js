@@ -12,6 +12,7 @@ module.exports = function (RED) {
     this.broker = n.broker
     this.brokerConn = RED.nodes.getNode(this.broker)
     this.ignoreEmpty = n.ignoreempty
+    this.removeMqttConfig = n.removemqttconfig
     if (!/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/.test(this.topic)) {
       return this.warn(RED._("mqtt.errors.invalid-topic"))
     }
@@ -55,8 +56,16 @@ module.exports = function (RED) {
             ) {
               msg._topic = topic
             }
+            if (this.removeMqttConfig) {
+              var delList = ["_topic", "qos", "retain", "topic"]
+              for (const item of delList) {
+                if (item in msg) {
+                  delete msg[item]
+                }
+              }
+            }
             node.send(msg)
-          },
+          }.bind(this),
           this.id
         )
         if (this.brokerConn.connected) {

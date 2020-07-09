@@ -45,7 +45,8 @@
             "tls-config":"TLS Configuration",
             "verify-server-cert":"Verify server certificate",
             "compatmode": "Use legacy MQTT 3.1 support",
-            "ignore-empty-topic": "ignore empty topic"
+            "ignore-empty-topic": "ignore empty topic",
+            "remove-mqtt-config": "remove MQTT configuration parameters from output message"
         },
         "sections-label":{
             "birth-message": "Message sent on connection (birth message)",
