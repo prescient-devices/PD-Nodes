@@ -43,11 +43,10 @@ module.exports = function (RED) {
             if (this.wholeMsg) {
               var skipList = ["_msgid", "qos", "retain", "topic"]
               var payload = clone(msg)
-              payload._wholeMsg = this.wholeMsg
               for (const prop of skipList) {
                 delete payload[prop]
               }
-              msg.payload = payload
+              msg.payload = { _payload: payload }
             }
             this.brokerConn.publish(msg, done) // send the message
           } else if (msg.topic.trim() && !this.ignoreEmpty) {

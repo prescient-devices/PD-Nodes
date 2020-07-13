@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-node-mqtt-out-json",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MQTT node that optionally transmits the whole message object, and/or ignores empty topics",
   "main": "index.js",
   "scripts": {
