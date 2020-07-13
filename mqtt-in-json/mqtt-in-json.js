@@ -42,13 +42,11 @@ module.exports = function (RED) {
               qos: packet.qos,
               retain: packet.retain,
             }
-            if (payload === Object(payload) && "_wholeMsg" in payload) {
-              for (const prop of Object.keys(payload).filter(
-                (item) => item !== "_wholeMsg"
-              )) {
-                msg[prop] = payload[prop]
+            if (payload === Object(payload) && "_payload" in payload) {
+              for (const prop of Object.keys(payload._payload)) {
+                msg[prop] = payload._payload[prop]
               }
-              msg.payload = payload.payload
+              delete payload._payload
             }
             if (
               node.brokerConn.broker === "localhost" ||

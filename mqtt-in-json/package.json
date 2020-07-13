@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-node-mqtt-in-json",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "MQTT input node that JSON-parses payload if possible, and optionally ignores empty topics. Paired with @prescient-devices/node-red-node-mqtt-out-json it is able to receive a whole message, not just the payload",
   "main": "index.js",
   "scripts": {
