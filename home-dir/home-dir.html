@@ -1,0 +1,20 @@
+<!--
+  Copyright 2020 Prescient Devices, Inc.
+-->
+<script type="text/javascript">
+    RED.nodes.registerType('home-dir',{
+        category: 'pdlib',
+        color: '#fdd0a2',
+        defaults: { },
+        inputs:1,
+        outputs:1,
+        icon: "light.svg",
+        label: function() {
+            return this.name||"home-dir";
+        }
+    });
+</script>
+
+<script type="text/html" data-help-name="home-dir">
+    <p>Returns Node-RED home directory</p>
+</script>

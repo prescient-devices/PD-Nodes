@@ -1,0 +1,26 @@
+{
+  "name": "@prescient-devices/node-red-contrib-home-dir",
+  "version": "1.0.0",
+  "description": "Returns Node-RED home directory",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Pablo Acosta-Serafini",
+  "license": "ISC",
+  "node-red": {
+    "nodes": {
+      "home-dir": "home-dir.js"
+    }
+  },
+  "keywords": [
+    "node-red"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com:prescient-devices/PD-Nodes.git"
+  }
+}
