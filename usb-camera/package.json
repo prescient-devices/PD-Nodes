@@ -1,0 +1,30 @@
+{
+  "name": "@prescient-devices/node-red-contrib-usb-camera",
+  "version": "1.0.0",
+  "description": "Front-end to the fswebcam utility to enable image capturing from within Node-RED",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Pablo Acosta-Serafini",
+  "license": "MIT",
+  "node-red": {
+    "nodes": {
+      "usb-camera": "usb-camera.js"
+    }
+  },
+  "keywords": [
+    "node-red", "usbcamera", "camera"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com:prescient-devices/PD-Nodes.git"
+  },
+  "dependencies": {
+    "node-webcam": "0.6.4",
+    "rimraf": "3.0.2"
+  }
+}

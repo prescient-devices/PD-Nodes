@@ -1,0 +1,51 @@
+<!--
+  Copyright 2020 Prescient Devices, Inc.
+-->
+<script type="text/html" data-help-name="usb-camera">
+  <p> This module is a front-end to the <a
+  href="https://github.com/fsphil/fswebcam">fswebcam</a> utility to enable
+  image capturing from within Node-RED. This node is disabled if fswebcam is
+  not detected. </p>
+  <h3>Inputs</h3>
+  <h4>Mode</h4>
+  There are four capture modes:
+  <ul>
+      <li>Template: the node output is a string with a fully specified HTML
+      <code>img</code> tag. The image is included as a Base64-encoded
+      string.</li>
+      <li>Encode: the node output is a Base64-encoded string with the image
+      information.</li>
+      <li>Buffer: the node output is an array of numbers with the image
+      information.</li>
+      <li>File: the node output is a string with the full path of the image
+      file.</li>
+  </ul>
+  <h4>Format</h4>
+  Supported image formats are JPEG and PNG.
+  <h4>File name</h4>
+  When the mode is <code>File</code> this input selects the location of the
+  output image file, which is also communicated in the node output. The
+  default is <code>${NODERED_HOME}/image.[png|jpg]</code>. The specified
+  directory is created if it does not exist.
+  <h4>Size</h4>
+  Width x height, both have to be greater than zero. The default is
+  <code>320</code>x<code>240</code>.
+  <h4>Quality</h4>
+  Number between <code>1</code> and <code>100</code> that determines the
+  amount of compression in the captured image. <code>100</code>, the default,
+  indicates no compression.
+  <h4>Delay</h4>
+  Approximate delay in milliseconds between the input message and the moment
+  the image is captured. The default is no delay.
+  <h4>Name</h4>
+  Node name.
+  <h3>Output</h3>
+  The node output depends on the input <code>Mode</code>:
+  <ul>
+      <li>Template: string with a fully specified HTML <code>img</code> tag.
+      The image is included as a Base64-encoded string.</li>
+      <li>Encode: Base64-encoded string with the image information.</li>
+      <li>Buffer: array of numbers with the image information.</li>
+      <li>File: string with the full path of the image file.</li>
+  </ul>
+</script>

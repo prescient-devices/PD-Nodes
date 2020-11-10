@@ -1,0 +1,21 @@
+{
+    "usb-camera": {
+        "label": {
+            "delay": "Delay",
+            "filename": "File name",
+            "format": "Format",
+            "mode": "Mode",
+            "quality": "Quality",
+            "size": "Size"
+        },
+        "status": {
+            "error": "Error",
+            "not-available": "Not available",
+            "stopped": "Stopped",
+            "ok": "OK"
+        },
+        "errors": {
+            "ignorenode": "fswebcam utility not found, node set inactive"
+        }
+    }
+}

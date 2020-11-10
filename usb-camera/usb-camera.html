@@ -1,0 +1,119 @@
+<!--
+  Copyright 2020 Prescient Devices, Inc.
+-->
+<script type="text/x-red" data-template-name="usb-camera">
+     <div class="form-row">
+         <label for="node-input-mode-selector"><span data-i18n="usb-camera.label.mode"></span></label>
+         <select id="node-input-mode-selector" style="width: 100px;">
+      <option value="template">Template</option>
+      <option value="encode">Encode</option>
+      <option value="buffer">Buffer</option>
+      <option value="file">File</option>
+         </select>
+         <select id="node-input-format-selector" style="width: 100px;">
+      <option value="jpg">JPEG</option>
+      <option value="png">PNG</option>
+         </select>
+     </div>
+     <div class="form-row" hidden>
+         <label for="node-input-mode"><span data-i18n="usb-camera.label.mode"></span></label>
+  <input type="text" id="node-input-mode">
+     </div>
+     <div class="form-row" hidden>
+         <label for="node-input-format><span data-i18n="usb-camera.label.format"></span></label>
+  <input type="text" id="node-input-format">
+     </div>
+    <div class="form-row" id="node-input-filename-row">
+         <label for="node-input-filename"><span data-i18n="usb-camera.label.filename"></span></label>
+  <input type="text" id="node-input-filename" placeholder="image.jpg">
+  </div>
+    <div class="form-row">
+         <label for="node-size"><span data-i18n="usb-camera.label.size"></span></label>
+  <input type="text" id="node-input-width" placeholder="320" style="width: 100px;">
+  x
+  <input type="text" id="node-input-height" placeholder="240" style="width: 100px;">
+     </div>
+    <div class="form-row">
+         <label for="node-input-quality"><span data-i18n="usb-camera.label.quality"></span></label>
+  <input type="text" id="node-input-quality" placeholder="100" style="width: 100px;">
+  </div>
+     </div>
+    <div class="form-row">
+         <label for="node-input-delay"><span data-i18n="usb-camera.label.delay"></span></label>
+  <input type="text" id="node-input-delay" placeholder="0" style="width: 100px;"> msec
+  </div>
+    <div class="form-row node-input-name">
+          <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+          <input type="text" id="node-input-name" placeholder="Camera">
+      </div>
+</script>
+
+<script type="text/javascript">
+  var validatePosOrNonNegInt = function (value, pos) {
+    if (!value.trim()) {
+      return true
+    }
+    if (isNaN(value) || (!isNaN(value) && (pos && parseFloat(value) <= 0) || (!pos && parseFloat(value) < 0))) {
+      return false
+    }
+    return parseFloat(value) === parseInt(value)
+  }
+  var validatePosInt = function (value) {
+    return validatePosOrNonNegInt(value, true)
+  }
+  var validateNonNegInt = function (value) {
+    return validatePosOrNonNegInt(value, false)
+  }
+  var validatePercentage = function (value) {
+    if (!value.trim()) {
+      return true
+    }
+    return validatePosInt(value) && parseInt(value) <= 100
+  }
+  RED.nodes.registerType("usb-camera", {
+    category: "pdlib",
+    color: "#c6dbef",
+    defaults: {
+      mode: { value: "buffer" },
+      format: { value: "jpg" },
+      filename: { value: "image.jpg" },
+      width: { value: "320", validate: validatePosInt },
+      height: { value: "240", validate: validatePosInt },
+      quality: { value: "100", validate: validatePercentage },
+      delay: { value: "0", validate: validateNonNegInt },
+      name: { value: "" },
+    },
+    inputs: 1,
+    outputs: 1,
+    icon: "font-awesome/fa-camera",
+    label: function () {
+      return this.name || "usb-camera"
+    },
+    oneditprepare: function () {
+      var mode = $("#node-input-mode").val() || "template"
+      var format = $("#node-input-format").val() || "jpg"
+      $("#node-input-mode-selector").val(mode)
+      $("#node-input-format-selector").val(format)
+      $("#node-input-filename").attr("placeholder", "image." + format)
+      if ($("#node-input-mode-selector").val() !== "file") {
+        $("#node-input-filename-row").hide()
+      }
+      var formatObj = $("#node-input-format-selector")
+      formatObj.on("change", function () {
+        var value = $("#node-input-format-selector").val()
+        $("#node-input-format").val(value)
+        $("#node-input-filename").attr("placeholder", "image." + value)
+      })
+      var modeObj = $("#node-input-mode-selector")
+      modeObj.on("change", function () {
+        var value = $("#node-input-mode-selector").val()
+        $("#node-input-mode").val(value)
+        if (value === "file") {
+          $("#node-input-filename-row").show()
+        } else {
+          $("#node-input-filename-row").hide()
+        }
+      })
+    },
+  })
+</script>
