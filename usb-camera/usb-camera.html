@@ -2,50 +2,65 @@
   Copyright 2020 Prescient Devices, Inc.
 -->
 <script type="text/x-red" data-template-name="usb-camera">
-     <div class="form-row">
-         <label for="node-input-mode-selector"><span data-i18n="usb-camera.label.mode"></span></label>
-         <select id="node-input-mode-selector" style="width: 100px;">
+  <div class="form-row">
+    <label for="node-input-mode-selector"><span data-i18n="usb-camera.label.mode"></span></label>
+    <select id="node-input-mode-selector" style="width: 100px;">
       <option value="template">Template</option>
       <option value="encode">Encode</option>
       <option value="buffer">Buffer</option>
       <option value="file">File</option>
-         </select>
-         <select id="node-input-format-selector" style="width: 100px;">
+    </select>
+    <select id="node-input-format-selector" style="width: 100px;">
       <option value="jpg">JPEG</option>
       <option value="png">PNG</option>
-         </select>
-     </div>
-     <div class="form-row" hidden>
-         <label for="node-input-mode"><span data-i18n="usb-camera.label.mode"></span></label>
-  <input type="text" id="node-input-mode">
-     </div>
-     <div class="form-row" hidden>
-         <label for="node-input-format><span data-i18n="usb-camera.label.format"></span></label>
-  <input type="text" id="node-input-format">
-     </div>
+    </select>
+  </div>
+  <div class="form-row" hidden>
+    <label for="node-input-mode"><span data-i18n="usb-camera.label.mode"></span></label>
+    <input type="text" id="node-input-mode">
+  </div>
+  <div class="form-row" hidden>
+    <label for="node-input-format><span data-i18n="usb-camera.label.format"></span></label>
+    <input type="text" id="node-input-format">
+  </div>
     <div class="form-row" id="node-input-filename-row">
-         <label for="node-input-filename"><span data-i18n="usb-camera.label.filename"></span></label>
-  <input type="text" id="node-input-filename" placeholder="image.jpg">
+    <label for="node-input-filename"><span data-i18n="usb-camera.label.filename"></span></label>
+    <input type="text" id="node-input-filename" placeholder="image.jpg">
   </div>
-    <div class="form-row">
-         <label for="node-size"><span data-i18n="usb-camera.label.size"></span></label>
-  <input type="text" id="node-input-width" placeholder="320" style="width: 100px;">
-  x
-  <input type="text" id="node-input-height" placeholder="240" style="width: 100px;">
-     </div>
-    <div class="form-row">
-         <label for="node-input-quality"><span data-i18n="usb-camera.label.quality"></span></label>
-  <input type="text" id="node-input-quality" placeholder="100" style="width: 100px;">
+  <div class="form-row">
+    <label for="node-size"><span data-i18n="usb-camera.label.size"></span></label>
+    <input type="text" id="node-input-width" placeholder="320" style="width: 100px;">
+    x
+    <input type="text" id="node-input-height" placeholder="240" style="width: 100px;">
   </div>
-     </div>
-    <div class="form-row">
-         <label for="node-input-delay"><span data-i18n="usb-camera.label.delay"></span></label>
-  <input type="text" id="node-input-delay" placeholder="0" style="width: 100px;"> msec
+  <div class="form-row">
+    <label for="node-input-quality"><span data-i18n="usb-camera.label.quality"></span></label>
+    <input type="text" id="node-input-quality" placeholder="100" style="width: 100px;">
   </div>
-    <div class="form-row node-input-name">
-          <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-          <input type="text" id="node-input-name" placeholder="Camera">
-      </div>
+  <div class="form-row">
+    <label for="node-input-brightness"><span data-i18n="usb-camera.label.brightness"></span></label>
+    <input type="text" id="node-input-brightness" placeholder="50" style="width: 100px;"> %
+  </div>
+  <div class="form-row">
+    <label for="node-input-contrast"><span data-i18n="usb-camera.label.contrast"></span></label>
+    <input type="text" id="node-input-contrast" placeholder="50" style="width: 100px;"> %
+  </div>
+  <div class="form-row">
+    <label for="node-input-saturation"><span data-i18n="usb-camera.label.saturation"></span></label>
+    <input type="text" id="node-input-saturation" placeholder="50" style="width: 100px;"> %
+  </div>
+  <div class="form-row">
+    <label for="node-input-hue"><span data-i18n="usb-camera.label.hue"></span></label>
+    <input type="text" id="node-input-hue" placeholder="50" style="width: 100px;"> %
+  </div>
+   <div class="form-row">
+    <label for="node-input-delay"><span data-i18n="usb-camera.label.delay"></span></label>
+    <input type="text" id="node-input-delay" placeholder="0" style="width: 100px;"> msec
+  </div>
+  <div class="form-row node-input-name">
+    <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+    <input type="text" id="node-input-name" placeholder="Camera">
+  </div>
 </script>
 
 <script type="text/javascript">
@@ -68,7 +83,10 @@
     if (!value.trim()) {
       return true
     }
-    return validatePosInt(value) && parseInt(value) <= 100
+    return validateNonNegInt(value) && parseInt(value) <= 100
+  }
+  var validateQuality = function (value) {
+    return validatePosInt(value) && validatePercentage(value)
   }
   RED.nodes.registerType("usb-camera", {
     category: "pdlib",
@@ -79,7 +97,11 @@
       filename: { value: "image.jpg" },
       width: { value: "320", validate: validatePosInt },
       height: { value: "240", validate: validatePosInt },
-      quality: { value: "100", validate: validatePercentage },
+      quality: { value: "100", validate: validateQuality },
+      brightness: { value: "50", validate: validatePercentage },
+      contrast: { value: "50", validate: validatePercentage },
+      saturation: { value: "50", validate: validatePercentage },
+      hue: { value: "50", validate: validatePercentage },
       delay: { value: "0", validate: validateNonNegInt },
       name: { value: "" },
     },

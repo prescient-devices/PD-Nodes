@@ -164,30 +164,51 @@ module.exports = function (RED) {
     } else {
       node.status({ fill: "green", shape: "dot", text: RED._("usb-camera.status.ok") })
       node.on("input", function (msg) {
-        var opts = {
-          width: parseInt(config.width),
-          height: parseInt(config.height),
-          quality: parseInt(config.quality),
-          frames: 1,
-          delay: parseInt(config.delay),
-          saveShots: true,
-          output: config.format === "png" ? "png" : "jpeg",
-          device: false,
-          callbackReturn: {
-            template: "base64",
-            encode: "base64",
-            buffer: "buffer",
-            file: "location",
-          }[config.mode],
-          verbose: globalDebug,
-        }
-        globalQueue.push({
-          node: node,
-          config: config,
-          opts: opts,
-          msg: msg,
+        return promiseTimeout(
+          globalCaptureTimeout,
+          new Promise(function (resolve) {
+            NodeWebcam.listControls(function (controls) {
+              return resolve(controls)
+            })
+          })
+        ).then(function (controls) {
+          var perToNum = function (control, per) {
+            var obj = controls.find(function (item) {
+              return item.name === control
+            })
+            return !obj ? 0 : obj.min + Math.floor(((obj.max - obj.min) * per) / 100)
+          }
+          var opts = {
+            width: parseInt(config.width),
+            height: parseInt(config.height),
+            quality: parseInt(config.quality),
+            frames: 1,
+            delay: parseInt(config.delay),
+            saveShots: true,
+            output: config.format === "png" ? "png" : "jpeg",
+            device: false,
+            callbackReturn: {
+              template: "base64",
+              encode: "base64",
+              buffer: "buffer",
+              file: "location",
+            }[config.mode],
+            setValues: {
+              Brightness: perToNum("Brightness", config.brightness),
+              Contrast: perToNum("Contrast", config.contrast),
+              Saturation: perToNum("Saturation", config.saturation),
+              Hue: perToNum("Hue", config.hue),
+            },
+            verbose: globalDebug,
+          }
+          globalQueue.push({
+            node: node,
+            config: config,
+            opts: opts,
+            msg: msg,
+          })
+          process(1)
         })
-        process(1)
       })
     }
   }

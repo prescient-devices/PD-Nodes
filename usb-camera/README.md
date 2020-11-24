@@ -33,6 +33,22 @@ Width x height, both have to be greater than zero. The default is `320`x`240`.
 
 Number between `1` and `100` that determines the amount of compression in the captured image. `100`, the default, indicates no compression.
 
+#### Brightness
+
+Percentage that sets the relative image brightness. The default is 50%. This setting may not be available in all cameras, in which case it is ignored.
+
+#### Contrast
+
+Percentage that sets the relative image contrast. The default is 50%. This setting may not be available in all cameras, in which case it is ignored.
+
+#### Saturation
+
+Percentage that sets the relative image saturation. The default is 50%. This setting may not be available in all cameras, in which case it is ignored.
+
+#### Hue
+
+Percentage that sets the relative image hue. The default is 50%. This setting may not be available in all cameras, in which case it is ignored.
+
 #### Delay
 
 Approximate delay in milliseconds between the input message and the moment the image is captured. The default is no delay.

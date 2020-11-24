@@ -1,11 +1,15 @@
 {
     "usb-camera": {
         "label": {
+            "brightness": "Brightness",
+            "contrast": "Contrast",
             "delay": "Delay",
             "filename": "File name",
             "format": "Format",
+            "hue": "Hue",
             "mode": "Mode",
             "quality": "Quality",
+            "saturation": "Saturation",
             "size": "Size"
         },
         "status": {
