@@ -1,3 +1,6 @@
+.hooks/repo-cfg.sh
 mqtt-in-json/.npmrc
 revpi-dio/.npmrc
 get-flow/.npmrc
+usb-camera/.npmrc
+usb-camera/node_modules
