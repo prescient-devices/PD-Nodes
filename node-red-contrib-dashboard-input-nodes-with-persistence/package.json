@@ -1,0 +1,36 @@
+{
+    "name": "@prescient-devices/node-red-contrib-dashboard-input-nodes-with-persistence",
+    "version": "1.0.1",
+    "description": "Drop-in replacement for the standard dashboard input nodes but with the option to have input persistence over node (re)starts",
+    "keywords": [
+        "node-red",
+        "dashboard",
+        "persistence"
+    ],
+    "main": "none",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "Pablo Acosta <pablo.acosta@prescientdevices.com>",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "ssh://git@github.com:prescient-devices/PD-Nodes.git"
+    },
+    "node-red": {
+        "version": ">=0.14.0",
+        "nodes": {
+            "ui_dropdown_persistent": "nodes/ui_dropdown_persistent.js",
+            "ui_switch_persistent": "nodes/ui_switch_persistent.js",
+            "ui_slider_persistent": "nodes/ui_slider_persistent.js",
+            "ui_numeric_persistent": "nodes/ui_numeric_persistent.js",
+            "ui_text_input_persistent": "nodes/ui_text_input_persistent.js",
+            "ui_date_picker_persistent": "nodes/ui_date_picker_persistent.js",
+            "ui_colour_picker_persistent": "nodes/ui_colour_picker_persistent.js",
+            "ui_form_persistent": "nodes/ui_form_persistent.js"
+        }
+    },
+    "dependencies": {
+        "socket.io": "~2.4.1"
+    }
+}

@@ -1,0 +1,41 @@
+// persistentStateUiLogic definition
+    function persistentStateUiLogic(RED, node) {
+        var storeNames = RED.settings.context.stores.sort();
+        storeNames.forEach(function (storeName) {
+            $("#node-input-store").append(
+                "<option value=" + storeName + ">" + storeName + "</option>"
+            );
+        })
+        storeName = storeNames.includes(node.store) ? node.store : storeNames[0]
+        $("#node-input-store").val(storeName);
+        $("#node-input-storestate").on("change", function () {
+            var value = $(this).prop("checked");
+            if (value) {
+                $("#node-storestate-select").show();
+            } else {
+                $("#node-storestate-select").hide();
+            }
+        })
+    }
+// persistentStateUiLogic definition
+ 
+// defaults
+            storestate: {value: false},
+            store: {value: ""},
+// defaults
+
+// persistentStateUiLogic instantiation
+            persistentStateUiLogic(RED, this);
+// persistentStateUiLogic instantiation
+
+// UI
+    <div class="form-row">
+        <label style="width:auto" for="node-input-storestate"><i class="fa fa-database"></i> Save and restore state from persistent context: </label>
+        <input type="checkbox" id="node-input-storestate" style="display:inline-block; width:auto; vertical-align:top;">
+    </div>
+    <div class="form-row" id="node-storestate-select" style="margin-left:25px;">
+        <label for="node-input-store">Context store</label>
+        <select id="node-input-store" style="width:35%">
+        </select>
+    </div>
+// UI

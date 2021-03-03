@@ -1,0 +1,15 @@
+<script type="text/html" data-help-name="ui_date_picker_persistent">
+    <p>Adds a date picker widget to the user interface.</p>
+    <p>The date display can be formatted in the Dashboard - Site tab using <a href="https://momentjs.com/docs/#/displaying/">
+    moment.js</a> formatting. For example <code>MM/DD/YYYY</code>, <code>Do MMM YYYY</code> or <code>YYYY-MM-DD</code>.</p>
+    <p>Setting <code>msg.enabled</code> to <code>false</code> will disable the input.</p>
+    <p>The state of this input widget may be made to persist node (re)starts
+    by checking the "Save and restore state from persistent context" option.
+    The desired context store to use may be selected once the option is
+    checked. It is imperative to select a context store that <i>is</i>
+    persistent (the memory context store is <i>not</i>, for example) since
+    there is no programmatic way to verify the persistence feature of a given
+    context store. If the "If <code>msg</code> arrives on input, pass through
+    to output" option is also checked, a message is generated immediately
+    after a node (re)tart.</p>
+</script>
