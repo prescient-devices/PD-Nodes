@@ -38,6 +38,7 @@ module.exports = function(RED) {
         node.on("input", function(msg) {
             node.topi = msg.topic;
         });
+        state.validateStore(config, node)
         if (config.storestate) {
             var initState = state.getState(config, node, config.payload || node.id);
             var text = config.multiple ? initState.length + " items" : initState

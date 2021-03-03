@@ -14,6 +14,7 @@ module.exports = function(RED) {
         node.on("input", function(msg) {
             node.topi = msg.topic;
         });
+        state.validateStore(config, node)
         if (config.storestate) {
             config.passthru = true;
             var initState = state.getState(config, node, config.payload || node.id);

@@ -15,6 +15,7 @@ module.exports = function(RED) {
         node.on("input", function(msg) {
             node.topi = msg.topic;
         });
+        state.validateStore(config, node)
         if (config.storestate) {
             var initState = state.getState(config, node, new Date().setUTCHours(0,0,0,0));
             state.passInitState(config, node, initState);

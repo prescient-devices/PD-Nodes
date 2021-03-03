@@ -18,23 +18,22 @@ def get_part(part_name):
 -->
 <script type="text/javascript">
     //[[[cog get_part("// persistentStateUiLogic definition") ]]]
-    function persistentStateUiLogic(RED, node) {
-        var storeNames = RED.settings.context.stores.sort();
-        storeNames.forEach(function (storeName) {
-            $("#node-input-store").append(
-                "<option value=" + storeName + ">" + storeName + "</option>"
-            );
-        })
-        storeName = storeNames.includes(node.store) ? node.store : storeNames[0]
-        $("#node-input-store").val(storeName);
-        $("#node-input-storestate").on("change", function () {
-            var value = $(this).prop("checked");
-            if (value) {
-                $("#node-storestate-select").show();
-            } else {
-                $("#node-storestate-select").hide();
-            }
-        })
+     function persistentStateUiLogic(RED, node) {
+         $("#node-input-storestate").on("change", function () {
+             var value = $(this).prop("checked");
+             if (value) {
+                 $("#node-storestate-select").show();
+             } else {
+                 $("#node-storestate-select").hide();
+             }
+         })
+         $('#node-input-store').typedInput({
+             default: 'node',
+             typeField: $("#node-input-storeType"),
+             types: ['flow','global']
+         });
+         console.log($("#node-input-store"))
+         console.log($("#node-input-storeType"))
     }
     //[[[end]]]
     RED.nodes.registerType('ui_date_picker_persistent',{
@@ -43,7 +42,8 @@ def get_part(part_name):
         defaults: {
             //[[[cog get_part("// defaults") ]]]
             storestate: {value: false},
-            store: {value: ""},
+            store: {value: "", validate: (RED.validators.hasOwnProperty('typedInput')?RED.validators.typedInput('storeType'):function(v) { return true})},
+            storeType: {value: 'flow'},
             //[[[end]]]
             name: {value: ''},
             label: {value: 'date persistent'},
@@ -112,10 +112,10 @@ def get_part(part_name):
         <label style="width:auto" for="node-input-storestate"><i class="fa fa-database"></i> Save and restore state from persistent context: </label>
         <input type="checkbox" id="node-input-storestate" style="display:inline-block; width:auto; vertical-align:top;">
     </div>
-    <div class="form-row" id="node-storestate-select" style="margin-left:25px;">
-        <label for="node-input-store">Context store</label>
-        <select id="node-input-store" style="width:35%">
-        </select>
+    <div class="form-row" id="node-storestate-select">
+        <label for="node-input-store" style="padding-left:25px; margin-right:-25px">Location</label>
+        <input type="text" id="node-input-store" style="width:70%">
+        <input type="hidden" id="node-input-storeType">
     </div>
     <!--[[[end]]]-->
     <div class="form-row">

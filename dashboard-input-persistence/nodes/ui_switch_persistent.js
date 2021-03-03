@@ -49,6 +49,7 @@ module.exports = function(RED) {
         node.on("input", function(msg) {
             node.topi = msg.topic;
         });
+        state.validateStore(config, node)
         if (config.storestate) {
             var initState = state.getState(config, node, false);
             var props = {

@@ -1,5 +1,4 @@
 var globalRED
-var globalStateContextVariableName = "state"
 
 module.exports = function (RED) {
   globalRED = RED
@@ -8,6 +7,7 @@ module.exports = function (RED) {
     getState: getState,
     passInitState: passInitState,
     saveState: saveState,
+    validateStore: validateStore,
   }
 }
 
@@ -28,7 +28,12 @@ function getState(config, node, defaultValue) {
   if (!config.storestate) {
     return defaultValue
   }
-  var state = node.context().get(globalStateContextVariableName, config.store)
+  var obj = globalRED.util.parseContextStore(config.store)
+  var context = {
+    flow: node.context().flow,
+    global: node.context().global,
+  }
+  var state = context[config.storeType].get(obj.key, obj.store)
   return state !== undefined ? state : defaultValue
 }
 
@@ -57,5 +62,24 @@ function saveState(config, node, state) {
       node.warn("state could not be saved: " + error.message)
     }
   }
-  node.context().set(globalStateContextVariableName, state, config.store, callback)
+  var obj = globalRED.util.parseContextStore(config.store)
+  var context = {
+    flow: node.context().flow,
+    global: node.context().global,
+  }
+  context[config.storeType].set(obj.key, state, obj.store, callback)
+}
+
+function validateStore(config, node) {
+  if (config.storeType === "flow" || config.storeType === "global") {
+    try {
+      parts = globalRED.util.normalisePropertyExpression(config.store)
+      if (parts.length === 0) {
+        throw new Error()
+      }
+    } catch (err) {
+      node.warn("Invalid persistent location expression - disabling")
+      config.storestate = false
+    }
+  }
 }
