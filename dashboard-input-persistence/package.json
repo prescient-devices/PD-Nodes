@@ -1,5 +1,5 @@
 {
-    "name": "@prescient-devices/node-red-contrib-dashboard-input-nodes-with-persistence",
+    "name": "@prescient-devices/node-red-contrib-dashboard-input-persistence",
     "version": "1.0.1",
     "description": "Drop-in replacement for the standard dashboard input nodes but with the option to have input persistence over node (re)starts",
     "keywords": [
