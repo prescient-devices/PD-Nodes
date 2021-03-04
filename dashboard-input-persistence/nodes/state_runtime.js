@@ -42,6 +42,7 @@ function passInitState(config, node, initState) {
     initState = initState || getState(config, node)
     var initMsg = function () {
       globalRED.events.removeListener("nodes-started", initMsg)
+      globalRED.events.setMaxListeners(globalRED.events.getMaxListeners()-1)
       var msg = { payload: initState }
       addTopic(config, node, msg)
       var timer = setTimeout(() => {
@@ -49,6 +50,7 @@ function passInitState(config, node, initState) {
         node.send(msg)
       }, 300)
     }
+    globalRED.events.setMaxListeners(globalRED.events.getMaxListeners()+1)
     globalRED.events.on("nodes-started", initMsg)
   }
 }
