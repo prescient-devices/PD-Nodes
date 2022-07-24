@@ -1,0 +1,29 @@
+{
+  "downloadfile": {
+    "encoding": {
+      "none": "default",
+      "setbymsg": "set by msg.encoding",
+      "native": "Native",
+      "unicode": "Unicode",
+      "japanese": "Japanese",
+      "chinese": "Chinese",
+      "korean": "Korean",
+      "taiwan": "Taiwan/Hong Kong",
+      "windows": "Windows codepages",
+      "iso": "ISO codepages",
+      "ibm": "IBM codepages",
+      "mac": "Mac codepages",
+      "koi8": "KOI8 codepages",
+      "misc": "Miscellaneous"
+    },
+    "label": {
+      "encoding": "Encoding",
+      "filename": "File name",
+      "name": "Name"
+    },
+    "warn": {
+      "cannot_convert_to_string": "",
+      "no_payload": "Message has no payload"
+    }
+  }
+}

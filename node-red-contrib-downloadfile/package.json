@@ -1,0 +1,39 @@
+{
+  "name": "@prescient-devices/node-red-contrib-downloadfile",
+  "version": "1.0.4",
+  "description": "Opens web browser file save dialog and saves the payload received to a file in the local filesystem",
+  "scripts": {
+    "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
+  },
+  "author": "Pablo Acosta-Serafini <pablo.acosta@prescientdevices.com>",
+  "license": "MIT",
+  "node-red": {
+    "version": ">=2.1.3",
+    "nodes": {
+      "downloadfile": "downloadfile.js"
+    }
+  },
+  "keywords": [
+    "node-red",
+    "download"
+  ],
+  "bugs": {
+    "url": "https://github.com/prescient-devices/PD-Nodes/issues"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "dependencies": {
+    "pupeteer": "0.0.1"
+  },
+  "devDependencies": {
+    "chai": "^4.3.6",
+    "jshint": "^2.13.5",
+    "mocha": "^8.4.0",
+    "node-red": "^2.2.2",
+    "node-red-node-test-helper": "^0.2.7",
+    "prettier": "^2.7.1",
+    "puppeteer": "^15.5.0",
+    "rimraf": "^3.0.2"
+  }
+}

@@ -1,0 +1,47 @@
+[
+    {
+        "id": "f4270d4a475d72fd",
+        "type": "tab",
+        "label": "downloadfile example",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "bb6ffc1b678054c6",
+        "type": "downloadfile",
+        "z": "f4270d4a475d72fd",
+        "name": "Download to local file system",
+        "filename": "myfile.txt",
+        "encoding": "none",
+        "x": 360,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "6ec072cac79a9c03",
+        "type": "inject",
+        "z": "f4270d4a475d72fd",
+        "name": "Text to save",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "Hello world!",
+        "payloadType": "str",
+        "trigger": true,
+        "x": 130,
+        "y": 60,
+        "wires": [
+            [
+                "bb6ffc1b678054c6"
+            ]
+        ]
+    }
+]
