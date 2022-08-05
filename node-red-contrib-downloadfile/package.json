@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-downloadfile",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Opens web browser file save dialog and saves the payload received to a file in the local filesystem",
   "scripts": {
     "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
@@ -22,9 +22,6 @@
   },
   "engines": {
     "node": ">=12.0.0"
-  },
-  "dependencies": {
-    "pupeteer": "0.0.1"
   },
   "devDependencies": {
     "chai": "^4.3.6",

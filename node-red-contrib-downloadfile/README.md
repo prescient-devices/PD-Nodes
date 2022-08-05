@@ -20,7 +20,10 @@ following commands (assuming the user's Node-RED directory is
 
 ### Running Tests
 
-The development dependencies need to be installed before running the test-bench. This can be accomplished with the following commands (assuming `${HOME}/node-red-contrib-downloadfile` is the node's development directory where the node's `package.json` is):
+The development dependencies need to be installed before running the test-bench.
+This can be accomplished with the following commands (assuming
+`${HOME}/node-red-contrib-downloadfile` is the node's development directory
+where the node's `package.json` is):
 
     $ cd "${HOME}"/ode-red-contrib-downloadfile
     $ npm install
@@ -34,9 +37,12 @@ Then to run the tests:
 
 ### Contributing / Fixes
 
-An issue may be raised for typos and single-line fixes. A pull request may be opened in the node's GitHub
-[repository](https://github.com/prescient-devices/PD-Nodes) for more complex fixes and/or contributions.
+An issue may be raised for typos and single-line fixes. A pull request may be
+opened in the node's GitHub
+[repository](https://github.com/prescient-devices/PD-Nodes) for more complex
+fixes and/or contributions.
 
 ### Copyright and license
 
-Copyright Prescient Devices, Inc. under the MIT license, which is in the LICENSE file.
+Copyright Prescient Devices, Inc. under the MIT license, which is in the LICENSE
+file.
