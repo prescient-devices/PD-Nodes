@@ -1,0 +1,31 @@
+<!--
+  Copyright 2022-Present Prescient Devices, Inc.
+-->
+<script type="text/html" data-help-name="promptinput">
+  <p>Emits an output message based on user input entered via browser's prompt.</p>
+  <h3>Outputs</h3>
+  <dl class="message-properties">
+    <dt class="optional">[user-defined]<span class="property-type">various</span></dt>
+    <dd>
+      A message property defined in the node configuration outputs the user input; its
+      data type may be string, number, object, Boolean or buffer.
+    </dd>
+  </dl>
+  <h3>Details</h3>
+  <p>
+    After clicking the input button the user is prompted for input, which is then
+    converted to the configured data type by default
+  </p>
+  <p>
+    The output data type may be overridden by prepending the input with
+    <code>str:</code> for string, <code>num:</code> for number, <code>obj:</code> for
+    object, <code>buf:</code> for Buffer, or <code>bool:</code> for Boolean.
+    <code>0</code> and <code>false</code> (case insensitive) are considered
+    <code>false</code> while <code>1</code> and <code>true</code> (case insensitive) are
+    considered <code>true</code>.
+  </p>
+  <p>
+    The prompt dialog window header may be optionally provided in the node's
+    configuration, otherwise the default is <code>Enter property value</code>.
+  </p>
+</script>

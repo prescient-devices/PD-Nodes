@@ -1,0 +1,28 @@
+{
+  "promptinput": {
+    "errors": {
+      "boolean": "Input value is not recognized as Boolean",
+      "conversion": "Cannot convert user input to selected data type",
+      "number": "Cannot convert user input to number",
+      "failed": "Failed to create message with user input\n__error__"
+    },
+    "label": {
+      "datatype": "Data type",
+      "default_prompt": "Enter property value [node id __id__]",
+      "name": "Name",
+      "prompt": "Prompt",
+      "property": "Property"
+    },
+    "notification": {
+      "failure": "Failed to create user input meessage",
+      "success": "Successfully created user input message"
+    },
+    "type_options": {
+      "bool": "Boolean",
+      "buf": "Buffer",
+      "num": "Number",
+      "obj": "Object",
+      "str": "String"
+    }
+  }
+}

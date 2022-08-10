@@ -1,0 +1,73 @@
+[
+  {
+    "id": "f43f796d9f81196b",
+    "type": "tab",
+    "label": "Ask for name",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "b92176149d1b409d",
+    "type": "debug",
+    "z": "f43f796d9f81196b",
+    "name": "Display name",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 540,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "9c27cc852191fd02",
+    "type": "promptinput",
+    "z": "f43f796d9f81196b",
+    "name": "Ask for name",
+    "datatype": "str",
+    "prompt": "What is your name?",
+    "property": "payload",
+    "propertyType": "msg",
+    "x": 130,
+    "y": 60,
+    "wires": [["51afd9239fc44a42"]]
+  },
+  {
+    "id": "da45cb447b6923c4",
+    "type": "comment",
+    "z": "f43f796d9f81196b",
+    "name": "Click the button!",
+    "info": "",
+    "x": 120,
+    "y": 120,
+    "wires": []
+  },
+  {
+    "id": "51afd9239fc44a42",
+    "type": "change",
+    "z": "f43f796d9f81196b",
+    "name": "Construct sentence",
+    "rules": [
+      {
+        "t": "set",
+        "p": "payload",
+        "pt": "msg",
+        "to": "\"Your name is \" & msg.payload",
+        "tot": "jsonata"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 330,
+    "y": 60,
+    "wires": [["b92176149d1b409d"]]
+  }
+]

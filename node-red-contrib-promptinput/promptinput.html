@@ -1,0 +1,113 @@
+<!--
+  Copyright 2022-Present Prescient Devices, Inc.
+-->
+<script type="text/x-red" data-template-name="promptinput">
+  <div class="form-row node-input-name">
+     <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="promptinput.label.name"></span></label>
+     <input type="text" id="node-input-name" data-i18n="[placeholder]promptinput.label.name" style="width: 339.19px;">
+   </div>
+   <div class="form-row node-input-prompt">
+     <label for="node-input-prompt"><i class="fa fa-question" style="width: 20px;"></i><span data-i18n="promptinput.label.prompt"></span></label>
+     <input type="text" id="node-input-prompt" data-i18n="[placeholder]promptinput.label.default_prompt" style="width: 339.19px;">
+   </div>
+   <div class="form-row">
+       <label for="node-input-typed-property"><i class="fa fa-sitemap" style="width: 20px;"></i> <span data-i18n="promptinput.label.property"></span></label>
+       <input type="text" id="node-input-typed-property" data-i18n="[placeholder]promptinputlabel.payload" style="width: 339.19px;">
+       <input id="node-input-property" type="hidden">
+       <input id="node-input-propertyType" type="text" type="hidden">
+   </div>
+   <div class="form-row">
+       <label for="node-input-datatype"><i class="fa fa-flag" style="width: 20px;"></i> <span data-i18n="promptinput.label.datatype"></span></label>
+       <select type="text" id="node-input-datatype" style="width: 250px;">
+         <option value="str" data-i18n="promptinput.type_options.str" selected></option>
+         <option value="obj" data-i18n="promptinput.type_options.obj"></option>
+         <option value="num" data-i18n="promptinput.type_options.num"></option>
+         <option value="bool" data-i18n="promptinput.type_options.bool"></option>
+         <option value="buf" data-i18n="promptinput.type_options.buf"></option>
+       </select>
+   </div>
+</script>
+
+<script type="text/javascript">
+  ; (function () {
+    let globalId = null
+    let globalFileInFlight = false
+    const globalIsInTest = window.navigator.userAgent === "__pdi-test-puppeteer__"
+    RED.nodes.registerType("promptinput", {
+      category: "pdilib",
+      color: "rgb(74, 179, 255)",
+      defaults: {
+        name: { value: "" },
+        datatype: { value: "str" },
+        prompt: { value: "" },
+        property: { value: "payload", required: true },
+        propertyType: { value: "msg" },
+      },
+      inputs: 0,
+      outputs: 1,
+      icon: "font-awesome/fa-question",
+      label: function () {
+        return this.name || "prompt input"
+      },
+      button: {
+        onclick: async function (obj) {
+          const notifyMsg = (arg) => globalIsInTest ? arg : node._(arg)
+          globalId = this.id
+          let node = this
+          const promptText =
+            typeof this.prompt === "string" && this.prompt.trim()
+              ? this.prompt
+              : node._("promptinput.label.defaultprompt", { id: globalId })
+          const input = prompt(promptText)
+          if (!input.trim()) {
+            return
+          }
+          $.ajax({
+            type: "POST",
+            url: `/node-red-contrib-promptinput/prompt/${globalId}`,
+            headers: {
+              Accept: "application/json",
+              "Content-type": "application/json",
+            },
+            data: JSON.stringify({ input }),
+            datatype: "json",
+            success: function () {
+              const msg = notifyMsg("promptinput.notification.success")
+              globalIsInTest && console.log(`promptinput: ${msg}`)
+              RED.notify(msg, {
+                type: "success",
+                id: "promptinput",
+                timeout: 2000,
+              })
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+              const msg = notifyMsg("promptinput.notification.failure")
+              globalIsInTest && console.log(`promptinput: ${msg} (${jqXHR.status})`)
+              RED.notify(msg, "error")
+            },
+          })
+        },
+      },
+      oneditprepare: function () {
+        $("#node-input-typed-property").typedInput({
+          default: "msg",
+          types: ["msg"],
+          typeField: $("#node-input-propertyType"),
+        })
+        let property =
+          !this.property || this.property === "false" ? "payload" : this.property + ""
+        $("#node-input-typed-property").typedInput("type", "msg")
+        $("#node-input-typed-property").typedInput("value", property)
+        $("#node-input-typed-property").on("change", function () {
+          let type = $("#node-input-typed-property").typedInput("type")
+          let value = $("#node-input-typed-property").typedInput("value")
+          if (type === "msg" && value === "") {
+            value = "payload"
+            $("#node-input-typed-property").typedInput("value", value)
+          }
+          value = $("#node-input-property").val(value)
+        })
+      },
+    })
+  })()
+</script>
