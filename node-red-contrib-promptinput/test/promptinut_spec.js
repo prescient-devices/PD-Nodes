@@ -1,6 +1,6 @@
 /**
  *
- * downloadfile_spec.js
+ * promptinput.js
  *
  * Copyright 2022-present Prescient Devices, Inc.
  *
@@ -15,17 +15,6 @@ const rimraf = require("rimraf")
 const should = require("should")
 // Node-RED imports
 const { spawn, spawnSync } = require("child_process")
-
-// Local imports
-const PromptInputNode = require(path.resolve(__dirname, "..", "promptinput.js"))
-
-const globalNodes = [PromptInputNode]
-const globalExampleFileName = path.resolve(
-  __dirname,
-  "..",
-  "examples",
-  "Ask for name.json"
-)
 
 // Functions
 function _capitalize(arg) {
@@ -103,7 +92,6 @@ function getFlow(filename, config) {
       wires: [],
     },
   ]
-  // let flowArray = JSON.parse(fs.readFileSync(globalExampleFileName))
   return flowArray
 }
 
@@ -134,6 +122,7 @@ async function handlePrompt(page, msg) {
     })
   })
 }
+
 // Tests
 describe("node-red-contrib-promptinput", function () {
   let execObj, stdout
