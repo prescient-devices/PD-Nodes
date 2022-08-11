@@ -25,13 +25,13 @@ This can be accomplished with the following commands (assuming
 `${HOME}/node-red-contrib-downloadfile` is the node's development directory
 where the node's `package.json` is):
 
-    $ cd "${HOME}"/ode-red-contrib-downloadfile
+    $ cd "${HOME}"/node-red-contrib-downloadfile
     $ npm install
     [...]
 
 Then to run the tests:
 
-    $ cd "${HOME}"/ode-red-contrib-downloadfile
+    $ cd "${HOME}"/node-red-contrib-downloadfile
     $ npm test
     [...]
 

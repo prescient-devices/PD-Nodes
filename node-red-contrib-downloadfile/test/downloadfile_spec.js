@@ -10,6 +10,7 @@
 const fs = require("fs")
 const path = require("path")
 // npm imports
+const clone = require("clone")
 const puppeteer = require("puppeteer")
 const rimraf = require("rimraf")
 const should = require("should")
@@ -72,7 +73,7 @@ function testNodeWarning(config, msg) {
 helper.init(require.resolve("node-red"))
 
 // Tests
-describe("downloadfile", function () {
+describe("node-red-contrib-downloadfile", function () {
   describe("Errors", function () {
     beforeEach(function (done) {
       helper.startServer(done)
@@ -102,44 +103,69 @@ describe("downloadfile", function () {
     let execObj
     const testDir = path.resolve(__dirname, ".node-red")
     const outputFile = path.resolve(testDir, "myfile.txt")
-    beforeEach(function () {
-      const nodeRedBin = path.resolve(
-        __dirname,
-        "..",
-        "node_modules",
-        ".bin",
-        "node-red"
-      )
-      rimraf.sync(testDir)
-      fs.mkdirSync(testDir, { recursive: true })
-      fs.copyFileSync(globalExampleFileName, path.resolve(testDir, "flows.json"))
-      spawnSync("npm", [
-        "install",
-        "--production",
-        "--prefix",
-        path.resolve(testDir),
-        path.resolve(__dirname, ".."),
-      ])
-      let settings = {}
-      const settingsFile = path.resolve(testDir, "settings.js")
-      if (fs.existsSync(settingsFile)) {
-        settings = JSON.parse(fs.readFileSync(settingsFile, "utf8"))
-      }
-      settings.editorTheme = settings.editorTheme || {}
-      settings.editorTheme.tours = false
-      settings.flowFile = "flows.json"
-      const data = `module.exports = ${JSON.stringify(settings, null, 2)}`
-      fs.writeFileSync(settingsFile, data)
-      execObj = spawn(nodeRedBin, [`--userDir=${testDir}`])
+    function startNodeRed(config, env, readOnly) {
       const debug = false
-      if (debug) {
+      return new Promise(function (resolve) {
+        const nodeRedBin = path.resolve(
+          __dirname,
+          "..",
+          "node_modules",
+          ".bin",
+          "node-red"
+        )
+        rimraf.sync(testDir)
+        fs.mkdirSync(testDir, { recursive: true })
+        fs.writeFileSync(
+          path.resolve(testDir, "flows.json"),
+          JSON.stringify(getFlow(config), null, 2)
+        )
+        spawnSync("npm", [
+          "install",
+          "--production",
+          "--prefix",
+          path.resolve(testDir),
+          path.resolve(__dirname, ".."),
+        ])
+        let settings = {}
+        const settingsFile = path.resolve(testDir, "settings.js")
+        if (fs.existsSync(settingsFile)) {
+          settings = require(settingsFile)
+        }
+        settings.editorTheme = settings.editorTheme || {}
+        settings.editorTheme.tours = false
+        settings.flowFile = "flows.json"
+        if (readOnly) {
+          settings.adminAuth = {
+            type: "credentials",
+            users: [
+              {
+                username: "admin",
+                password:
+                  "$2b$08$v/98KrBPLWFtFc6FyzHuNuspzrQ6PZktnT2SYgTDJECpibZAk8YC6",
+                permissions: ["read"],
+              },
+            ],
+          }
+        }
+        const data = `module.exports = ${JSON.stringify(settings, null, 2)}`
+        fs.writeFileSync(settingsFile, data)
+        let cmdEnv = Object.assign(clone(process.env), env || {})
+        execObj = spawn(nodeRedBin, [`--userDir=${testDir}`], { env: cmdEnv })
+        stdout = ""
         execObj.stdout.on("data", function (data) {
-          console.log(data.toString().trim())
+          stdout += data.toString()
+          debug && console.log(data.toString().trimEnd())
+          if (stdout.includes("Started flows")) {
+            return resolve()
+          }
         })
         execObj.stderr.on("data", function (data) {
-          console.log(data.toString().trim())
+          debug && console.log(data.toString().trim())
         })
-      }
+      })
+    }
+    beforeEach(async function () {
+      await startNodeRed()
     })
     afterEach(function () {
       try {
@@ -148,20 +174,18 @@ describe("downloadfile", function () {
       rimraf.sync(testDir)
     })
     it("Download message", async function () {
-      const browser = await puppeteer.launch()
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ["--user-agent=__pdi-test-puppeteer__"],
+      })
       const page = await browser.newPage()
       const client = await page.target().createCDPSession()
       await client.send("Page.setDownloadBehavior", {
         behavior: "allow",
         downloadPath: path.resolve(testDir),
       })
-      while (true) {
-        await delay(1 * 1000)
-        try {
-          await page.goto("http://127.0.0.1:1880")
-          break
-        } catch (_) {}
-      }
+      await page.goto("http://127.0.0.1:1880")
+      await page.waitForSelector("#red-ui-sidebar-tabs")
       await delay(5 * 1000)
       await page.mouse.click(225, 135, { button: "left" })
       await delay(5 * 1000)
