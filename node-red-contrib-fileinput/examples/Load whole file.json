@@ -1,0 +1,50 @@
+[
+  {
+    "id": "f95964b82673fe40",
+    "type": "tab",
+    "label": "Load whole file",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "1ec3021a9a15e139",
+    "type": "debug",
+    "z": "f95964b82673fe40",
+    "name": "File contents",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "{\"payload\":msg.payload, \"filename\":msg.filename, \"end\":msg.end}",
+    "targetType": "jsonata",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 330,
+    "y": 60,
+    "wires": []
+  },
+  {
+    "id": "fbeed8ed651b1fff",
+    "type": "fileinput",
+    "z": "f95964b82673fe40",
+    "name": "Load whole file",
+    "datatype": "str",
+    "stream": "no",
+    "property": "payload",
+    "propertyType": "msg",
+    "x": 140,
+    "y": 60,
+    "wires": [["1ec3021a9a15e139"]]
+  },
+  {
+    "id": "ee0ebc348789276c",
+    "type": "comment",
+    "z": "f95964b82673fe40",
+    "name": "Click the button!",
+    "info": "",
+    "x": 120,
+    "y": 120,
+    "wires": []
+  }
+]

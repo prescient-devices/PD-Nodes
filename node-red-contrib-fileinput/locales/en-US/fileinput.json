@@ -1,0 +1,33 @@
+{
+  "fileinput": {
+    "errors": {
+      "conversion": "Cannot convert input file to selected data type",
+      "failed": "Failed to create message(s) from input file \n__error__"
+    },
+    "label": {
+      "datatype": "Data type",
+      "name": "Name",
+      "property": "Property",
+      "stream": "Stream"
+    },
+    "notification": {
+      "authorization": "Not authorized to use node",
+      "success": "File __filename__ input successful",
+      "failure": "File __filename__ input failed"
+    },
+    "status": {
+      "error": "Error receiving file __filename__",
+      "progress": "File: __filename__ (__per__%)",
+      "success": "File __filename__ received"
+    },
+    "stream_options": {
+      "no": "No",
+      "yes": "Yes"
+    },
+    "type_options": {
+      "buf": "Buffer",
+      "obj": "Object",
+      "str": "String"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+<!--
+  Copyright 2022-Present Prescient Devices, Inc.
+-->
+<script type="text/html" data-help-name="fileinput">
+  <p>
+    Asks user to select a file from the browser's file sytem and then emits its contents
+    as a message or messages if the streaming option is selected.
+  </p>
+  <h3>Outputs</h3>
+  <dl class="message-properties">
+    <dt class="optional">[user-defined]<span class="property-type">various</span></dt>
+    <dd>
+      A message property defined in the node configuration outputs the user input; its
+      data type may be string, number, object, Boolean or buffer.
+    </dd>
+    <dt class="optional">filename<span class="property-type">string</span></dt>
+    <dd>The user-selected file base name.</dd>
+    <dt class="optional">end<span class="property-type">Boolean</span></dt>
+    <dd>
+      Flag that indicates whether the message is the last message containing a chunk of
+      the user-selected file or not. If streaming mode is not selected this flag is
+      always <code>false</code>.
+    </dd>
+  </dl>
+  <h3>Details</h3>
+  <p>
+    After clicking the input button the user is prompted to select a file from the
+    browser's file system. The file may be streamed (multiple messages may be emitted
+    containing chunks of the file) or loaded all at once (only one output message is
+    emitted with the entire contents of the selected file).
+  </p>
+</script>

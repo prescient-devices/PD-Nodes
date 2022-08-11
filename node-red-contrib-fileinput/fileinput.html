@@ -1,0 +1,152 @@
+<!--
+  Copyright 2022-Present Prescient Devices, Inc.
+-->
+<script type="text/x-red" data-template-name="fileinput">
+  <div class="form-row node-input-name">
+     <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="fileinput.label.name"></span></label>
+     <input type="text" id="node-input-name" data-i18n="[placeholder]fileinput.label.name" style="width: 339.19px;">
+   </div>
+  <div class="form-row node-input-stream" id="input-stream">
+     <label for="node-input-stream"><i class="fa fa-question" style="width: 20px;"></i><span data-i18n="fileinput.label.stream"></span></label>
+       <select type="text" id="node-input-stream" style="width: 250px;">
+         <option value="no" data-i18n="fileinput.stream_options.no" selected></option>
+         <option value="yes" data-i18n="fileinput.stream_options.yes"></option>
+       </select>
+   </div>
+  <div class="form-row">
+       <label for="node-input-typed-property"><i class="fa fa-sitemap" style="width: 20px;"></i> <span data-i18n="fileinput.label.property"></span></label>
+       <input type="text" id="node-input-typed-property" data-i18n="[placeholder]fileinputlabel.payload" style="width: 339.19px;">
+       <input id="node-input-property" type="hidden">
+       <input id="node-input-propertyType" type="text" type="hidden">
+   </div>
+   <div class="form-row">
+       <label for="node-input-datatype"><i class="fa fa-flag" style="width: 20px;"></i> <span data-i18n="fileinput.label.datatype"></span></label>
+       <select type="text" id="node-input-datatype" style="width: 250px;">
+         <option value="str" data-i18n="fileinput.type_options.str" selected></option>
+         <option value="obj" data-i18n="fileinput.type_options.obj"></option>
+         <option value="buf" data-i18n="fileinput.type_options.buf"></option>
+       </select>
+   </div>
+</script>
+
+<script type="text/javascript">
+  ; (function () {
+    let globalId = null
+    let globalFileInFlight = false
+    const globalIsInTest = window.navigator.userAgent === "__pdi-test-puppeteer__"
+    RED.nodes.registerType("fileinput", {
+      category: "pdilib",
+      color: "rgb(74, 179, 255)",
+      defaults: {
+        name: { value: "" },
+        datatype: { value: "str" },
+        stream: { value: false },
+        property: { value: "payload", required: true },
+        propertyType: { value: "msg" },
+      },
+      inputs: 0,
+      outputs: 1,
+      icon: "file-in.svg",
+      label: function () {
+        return this.name || "file input"
+      },
+      button: {
+        onclick: async function () {
+          globalId = this.id
+          let node = this
+          const notifyMsg = (arg, dict) => globalIsInTest ? arg : node._(arg, dict)
+          async function readFile() {
+            let that = this
+            if (!that.files.length) {
+              return
+            }
+            let fileBlob = that.files[0]
+            if (!fileBlob) {
+              return
+            }
+            const filename = fileBlob.name
+            const size = fileBlob.size
+            const fileData = { filename, size }
+            try {
+              await new Promise(function (resolve, reject) {
+                $.ajax({
+                  type: "POST",
+                  url: `/node-red-contrib-fileinput/file/${globalId}`,
+                  headers: {
+                    Accept: "application/json",
+                    "Content-type": "application/json",
+                  },
+                  data: JSON.stringify(fileData),
+                  datatype: "json",
+                  success: function () {
+                    return resolve()
+                  },
+                  error: function (jqXHR, textStatue, errorThrown) {
+                    const code = jqXHR.status
+                    const msg = notifyMsg(code === 401 ? "fileinput.notification.authorization" : "fileinput.notification.failure")
+                    globalIsInTest && console.log(`fileinput: ${msg} (${jqXHR.status})`)
+                    RED.notify(msg, "error")
+                    return reject()
+                  },
+                })
+              })
+            } catch (_) {
+              return
+            }
+            const request = new Request(
+              `/node-red-contrib-fileinput/file/${globalId}`,
+              {
+                method: "POST",
+                body: fileBlob,
+              }
+            )
+            try {
+              let response = await fetch(request)
+              if (typeof response === "object" && response.ok) {
+                const msg = notifyMsg("fileinput.notification.success", { filename })
+                globalIsInTest && console.log(`fileinput: ${msg}`)
+                return RED.notify(msg, { type: "success", id: "fileinput", timeout: 2000 })
+              }
+            } catch (error) { }
+            const msg = notifyMsg("fileinput.notification.failure", { filename })
+            globalIsInTest && console.log(`fileinput: ${msg}`)
+            RED.notify(msg, "error")
+          }
+          if (globalFileInFlight) {
+            return
+          }
+          globalFileInFlight = true
+          let obj
+          try {
+            obj = document.createElement("input")
+            obj.setAttribute("type", "file")
+            obj.addEventListener("change", readFile)
+            obj.click()
+          } catch (_) { }
+          obj && obj.remove()
+          globalFileInFlight = false
+        },
+      },
+      oneditprepare: function () {
+        $("#node-input-typed-property").typedInput({
+          default: "msg",
+          types: ["msg"],
+          typeField: $("#node-input-propertyType"),
+        })
+        let property =
+          !this.property || this.property === "false" ? "payload" : this.property + ""
+        $("#node-input-typed-property").typedInput("type", "msg")
+        $("#node-input-typed-property").typedInput("value", property)
+        $("#node-input-typed-property").on("change", function () {
+          let type = $("#node-input-typed-property").typedInput("type")
+          let value = $("#node-input-typed-property").typedInput("value")
+          if (type === "msg" && value === "") {
+            value = "payload"
+            $("#node-input-typed-property").typedInput("value", value)
+          }
+          value = $("#node-input-property").val(value)
+        })
+      },
+    })
+  })()
+</script>
