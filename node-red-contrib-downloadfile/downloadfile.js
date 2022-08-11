@@ -1,5 +1,8 @@
 /**
+ * downloadfile.js
+ *
  * Copyright 2022-Present Prescient Devices, Inc.
+ *
  **/
 
 /* jshint laxbreak: true */
@@ -37,7 +40,7 @@ module.exports = function (RED) {
         payload: {
           filename: msg.filename || config.filename || "data.txt",
           data: msg.payload,
-          encoding
+          encoding,
         },
       })
     })

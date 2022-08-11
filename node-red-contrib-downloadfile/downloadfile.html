@@ -18,44 +18,38 @@
 </script>
 
 <script type="text/javascript">
-  ; (function () {
+  ;(function () {
     let globalEncodings = [
-      ["downloadfile.encoding.native",
+      [
+        "downloadfile.encoding.native",
         "utf8",
         "ucs2",
         "utf-16le",
         "ascii",
         "binary",
         "base64",
-        "hex"
+        "hex",
       ],
-      ["downloadfile.encoding.unicode",
-        "utf-16be",
-      ],
-      ["downloadfile.encoding.japanese",
+      ["downloadfile.encoding.unicode", "utf-16be"],
+      [
+        "downloadfile.encoding.japanese",
         "Shift_JIS",
         "Windows-31j",
         "Windows932",
-        "EUC-JP"
+        "EUC-JP",
       ],
-      ["downloadfile.encoding.chinese",
+      [
+        "downloadfile.encoding.chinese",
         "GB2312",
         "GBK",
         "GB18030",
         "Windows936",
-        "EUC-CN"
+        "EUC-CN",
       ],
-      ["downloadfile.encoding.korean",
-        "KS_C_5601",
-        "Windows949",
-        "EUC-KR"
-      ],
-      ["downloadfile.encoding.taiwan",
-        "Big5",
-        "Big5-HKSCS",
-        "Windows950"
-      ],
-      ["downloadfile.encoding.windows",
+      ["downloadfile.encoding.korean", "KS_C_5601", "Windows949", "EUC-KR"],
+      ["downloadfile.encoding.taiwan", "Big5", "Big5-HKSCS", "Windows950"],
+      [
+        "downloadfile.encoding.windows",
         "cp874",
         "cp1250",
         "cp1251",
@@ -65,9 +59,10 @@
         "cp1255",
         "cp1256",
         "cp1257",
-        "cp1258"
+        "cp1258",
       ],
-      ["downloadfile.encoding.iso",
+      [
+        "downloadfile.encoding.iso",
         "ISO-8859-1",
         "ISO-8859-2",
         "ISO-8859-3",
@@ -83,9 +78,10 @@
         "ISO-8859-13",
         "ISO-8859-14",
         "ISO-8859-15",
-        "ISO-8859-16"
+        "ISO-8859-16",
       ],
-      ["downloadfile.encoding.ibm",
+      [
+        "downloadfile.encoding.ibm",
         "cp437",
         "cp737",
         "cp775",
@@ -108,9 +104,10 @@
         "cp1133",
         "cp1161",
         "cp1162",
-        "cp1163"
+        "cp1163",
       ],
-      ["downloadfile.encoding.mac",
+      [
+        "downloadfile.encoding.mac",
         "maccroatian",
         "maccyrillic",
         "macgreek",
@@ -121,15 +118,11 @@
         "macturkish",
         "macukraine",
         "maccenteuro",
-        "macintosh"
+        "macintosh",
       ],
-      ["downloadfile.encoding.koi8",
-        "koi8-r",
-        "koi8-u",
-        "koi8-ru",
-        "koi8-t"
-      ],
-      ["downloadfile.encoding.misc",
+      ["downloadfile.encoding.koi8", "koi8-r", "koi8-u", "koi8-ru", "koi8-t"],
+      [
+        "downloadfile.encoding.misc",
         "armscii8",
         "rk1048",
         "tcvn",
@@ -140,8 +133,8 @@
         "iso646cn",
         "iso646jp",
         "hproman8",
-        "tis620"
-      ]
+        "tis620",
+      ],
     ]
     RED.comms.subscribe("notification/#", function (topic, payload) {
       if (topic.startsWith("notification/DOWNLOAD-FILE")) {
@@ -157,17 +150,17 @@
           )
           obj.setAttribute("download", fname)
           obj.click()
-        } catch (_) { }
+        } catch (_) {}
         obj && obj.remove()
       }
     })
     RED.nodes.registerType("downloadfile", {
-      category: "pdlib",
+      category: "pdilib",
       color: "rgb(74, 179, 255)",
       defaults: {
         name: { value: "" },
         filename: { value: "" },
-        encoding: { value: "none" }
+        encoding: { value: "none" },
       },
       inputs: 1,
       outputs: 0,
@@ -181,30 +174,37 @@
         let label = node._("downloadfile.encoding.none")
         $("<option/>", {
           value: "none",
-          label: label
-        }).text(label).appendTo(encSel)
+          label: label,
+        })
+          .text(label)
+          .appendTo(encSel)
         $("<option/>", {
           value: "setbymsg",
-          label: node._("downloadfile.encoding.setbymsg")
-        }).text(label).appendTo(encSel)
+          label: node._("downloadfile.encoding.setbymsg"),
+        })
+          .text(label)
+          .appendTo(encSel)
         globalEncodings.forEach(function (item) {
           if (Array.isArray(item)) {
             var group = $("<optgroup/>", {
-              label: node._(item[0])
+              label: node._(item[0]),
             }).appendTo(encSel)
             for (var i = 1; i < item.length; i++) {
               var enc = item[i]
               $("<option/>", {
                 value: enc,
-                label: enc
-              }).text(enc).appendTo(group)
+                label: enc,
+              })
+                .text(enc)
+                .appendTo(group)
             }
-          }
-          else {
+          } else {
             $("<option/>", {
               value: item,
-              label: item
-            }).text(item).appendTo(encSel)
+              label: item,
+            })
+              .text(item)
+              .appendTo(encSel)
           }
         })
         encSel.val(node.encoding)
