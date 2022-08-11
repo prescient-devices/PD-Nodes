@@ -10,9 +10,9 @@
 
 const fs = require("fs")
 const globalIsInTest =
-  ["true", "1"].includes((process.env["__PDI-TEST__"] || "").toLowerCase()) ||
+  ["true", "1"].includes((process.env["__PDI_TEST__"] || "").toLowerCase()) ||
   typeof global.it === "function"
-const globalFailMode = globalIsInTest && process.env["__PDI-TEST-FAIL-MODE__"]
+const globalFailMode = globalIsInTest && process.env["__PDI_TEST_FAIL_MODE__"]
 module.exports = function (RED) {
   function errorMsg(arg) {
     return globalIsInTest ? arg : RED._(arg)

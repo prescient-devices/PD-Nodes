@@ -12,7 +12,7 @@ const path = require("path")
 // npm imports
 const puppeteer = require("puppeteer")
 const rimraf = require("rimraf")
-const should = require("should")
+const should = require("chai").should()
 // Node-RED imports
 const { spawn, spawnSync } = require("child_process")
 
@@ -114,6 +114,7 @@ function getError(stdout) {
       return tokens[1].slice(sentinel.length + 1).trim()
     })[0]
 }
+
 async function handlePrompt(page, msg) {
   return new Promise(function (resolve) {
     page.on("dialog", async function (dialog) {
@@ -128,7 +129,8 @@ describe("node-red-contrib-promptinput", function () {
   let execObj, stdout
   const testDir = path.resolve(__dirname, ".node-red")
   const outputFile = path.resolve(testDir, "output.json")
-  function startNodeRed(config) {
+  function startNodeRed(config, readOnly) {
+    const debug = false
     return new Promise(function (resolve) {
       const nodeRedBin = path.resolve(
         __dirname,
@@ -158,14 +160,25 @@ describe("node-red-contrib-promptinput", function () {
       settings.editorTheme = settings.editorTheme || {}
       settings.editorTheme.tours = false
       settings.flowFile = "flows.json"
+      if (readOnly) {
+        settings.adminAuth = {
+          type: "credentials",
+          users: [
+            {
+              username: "admin",
+              password: "$2b$08$v/98KrBPLWFtFc6FyzHuNuspzrQ6PZktnT2SYgTDJECpibZAk8YC6",
+              permissions: ["read"],
+            },
+          ],
+        }
+      }
       const data = `module.exports = ${JSON.stringify(settings, null, 2)}`
       fs.writeFileSync(settingsFile, data)
       execObj = spawn(nodeRedBin, [`--userDir=${testDir}`])
-      const debug = false
       stdout = ""
       execObj.stdout.on("data", function (data) {
         stdout += data.toString()
-        debug && console.log(data.toString().trim())
+        debug && console.log(data.toString().trimEnd())
         if (stdout.includes("Started flows")) {
           return resolve()
         }
@@ -175,10 +188,10 @@ describe("node-red-contrib-promptinput", function () {
       })
     })
   }
-  async function runTest(config, input, omitFile) {
+  async function runTest(config, input, omitFile, readOnly) {
     let title, browserStdout
     try {
-      await startNodeRed(config)
+      await startNodeRed(config, readOnly)
       const browser = await puppeteer.launch({
         headless: true,
         args: ["--user-agent=__pdi-test-puppeteer__"],
@@ -196,6 +209,13 @@ describe("node-red-contrib-promptinput", function () {
         browserStdout += args.trim()
       })
       await page.goto("http://127.0.0.1:1880")
+      if (readOnly) {
+        await page.waitForSelector("#node-dialog-login-username")
+        await page.type("#node-dialog-login-username", "admin")
+        await page.type("#node-dialog-login-password", "111111")
+        await page.click("#node-dialog-login-submit")
+        await page.waitForNavigation()
+      }
       await page.waitForSelector("#red-ui-sidebar-tabs")
       await delay(5 * 1000)
       let dialogPromise = handlePrompt(page, input)
@@ -219,8 +239,8 @@ describe("node-red-contrib-promptinput", function () {
     return { title, msg, stdout: browserStdout }
   }
   afterEach(function () {
-    delete process.env["__PDI-TEST__"]
-    delete process.env["__PDI-TEST-FAIL-MODE__"]
+    delete process.env["__PDI_TEST__"]
+    delete process.env["__PDI_TEST_FAIL_MODE__"]
     try {
       execObj.kill()
     } catch (_) {}
@@ -293,8 +313,8 @@ describe("node-red-contrib-promptinput", function () {
     ]
     tests.forEach((test) => {
       it(test.desc, async function () {
-        process.env["__PDI-TEST__"] = "1"
-        process.env["__PDI-TEST-FAIL-MODE__"] = test.mode
+        process.env["__PDI_TEST__"] = "1"
+        process.env["__PDI_TEST_FAIL_MODE__"] = test.mode
         let act = await runTest({}, "John", true)
         act.should.eql({
           stdout: `promptinput.notification.failure (${test.code})`,
@@ -303,22 +323,31 @@ describe("node-red-contrib-promptinput", function () {
         })
       })
     })
+    it("Authorization", async function () {
+      process.env["__PDI_TEST__"] = "1"
+      let act = await runTest({}, "John", true, true)
+      act.should.eql({
+        stdout: `promptinput.notification.authorization (401)`,
+        title: "promptinput.label.defaultprompt",
+        msg: "",
+      })
+    })
   })
   describe("Runtime errors", function () {
     it("Wrong Boolean data type", async function () {
-      process.env["__PDI-TEST__"] = "1"
+      process.env["__PDI_TEST__"] = "1"
       await runTest({}, "bool:John", true)
       const act = getError(stdout)
       act.should.equal("promptinput.errors.boolean")
     })
     it("Cannot convert to number", async function () {
-      process.env["__PDI-TEST__"] = "1"
+      process.env["__PDI_TEST__"] = "1"
       await runTest({}, "num:A", true)
       const act = getError(stdout)
       act.should.equal("promptinput.errors.number")
     })
     it("General conversion error", async function () {
-      process.env["__PDI-TEST__"] = "1"
+      process.env["__PDI_TEST__"] = "1"
       await runTest({}, "obj:A", true)
       const act = getError(stdout)
       act.should.equal("promptinput.errors.conversion")

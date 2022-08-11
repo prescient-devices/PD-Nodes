@@ -81,7 +81,8 @@
               })
             },
             error: function (jqXHR, textStatus, errorThrown) {
-              const msg = notifyMsg("promptinput.notification.failure")
+              const code = jqXHR.status
+              const msg = notifyMsg(code === 401 ? "promptinput.notification.authorization" : "promptinput.notification.failure")
               globalIsInTest && console.log(`promptinput: ${msg} (${jqXHR.status})`)
               RED.notify(msg, "error")
             },
