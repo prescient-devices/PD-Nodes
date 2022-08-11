@@ -14,8 +14,8 @@ const globalIsInTest =
   typeof global.it === "function"
 const globalFailMode = globalIsInTest && process.env["__PDI_TEST_FAIL_MODE__"]
 module.exports = function (RED) {
-  function errorMsg(arg) {
-    return globalIsInTest ? arg : RED._(arg)
+  function errorMsg(arg1, arg2) {
+    return globalIsInTest ? arg1 : RED._(arg1, arg2)
   }
   RED.httpAdmin.post(
     "/node-red-contrib-promptinput/prompt/:id",

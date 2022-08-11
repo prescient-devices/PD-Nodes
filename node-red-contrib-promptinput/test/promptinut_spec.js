@@ -1,6 +1,6 @@
 /**
  *
- * promptinput.js
+ * promptinput_spec.js
  *
  * Copyright 2022-present Prescient Devices, Inc.
  *
@@ -10,6 +10,7 @@
 const fs = require("fs")
 const path = require("path")
 // npm imports
+const clone = require("clone")
 const puppeteer = require("puppeteer")
 const rimraf = require("rimraf")
 const should = require("chai").should()
@@ -129,7 +130,7 @@ describe("node-red-contrib-promptinput", function () {
   let execObj, stdout
   const testDir = path.resolve(__dirname, ".node-red")
   const outputFile = path.resolve(testDir, "output.json")
-  function startNodeRed(config, readOnly) {
+  function startNodeRed(config, env, readOnly) {
     const debug = false
     return new Promise(function (resolve) {
       const nodeRedBin = path.resolve(
@@ -155,7 +156,7 @@ describe("node-red-contrib-promptinput", function () {
       let settings = {}
       const settingsFile = path.resolve(testDir, "settings.js")
       if (fs.existsSync(settingsFile)) {
-        settings = JSON.parse(fs.readFileSync(settingsFile, "utf8"))
+        settings = require(settingsFile)
       }
       settings.editorTheme = settings.editorTheme || {}
       settings.editorTheme.tours = false
@@ -174,7 +175,8 @@ describe("node-red-contrib-promptinput", function () {
       }
       const data = `module.exports = ${JSON.stringify(settings, null, 2)}`
       fs.writeFileSync(settingsFile, data)
-      execObj = spawn(nodeRedBin, [`--userDir=${testDir}`])
+      let cmdEnv = Object.assign(clone(process.env), env || {})
+      execObj = spawn(nodeRedBin, [`--userDir=${testDir}`], { env: cmdEnv })
       stdout = ""
       execObj.stdout.on("data", function (data) {
         stdout += data.toString()
@@ -188,10 +190,10 @@ describe("node-red-contrib-promptinput", function () {
       })
     })
   }
-  async function runTest(config, input, omitFile, readOnly) {
+  async function runTest(config, input, omitFile, env, readOnly) {
     let title, browserStdout
     try {
-      await startNodeRed(config, readOnly)
+      await startNodeRed(config, env, readOnly)
       const browser = await puppeteer.launch({
         headless: true,
         args: ["--user-agent=__pdi-test-puppeteer__"],
@@ -313,9 +315,10 @@ describe("node-red-contrib-promptinput", function () {
     ]
     tests.forEach((test) => {
       it(test.desc, async function () {
-        process.env["__PDI_TEST__"] = "1"
-        process.env["__PDI_TEST_FAIL_MODE__"] = test.mode
-        let act = await runTest({}, "John", true)
+        let env = {}
+        env["__PDI_TEST__"] = "1"
+        env["__PDI_TEST_FAIL_MODE__"] = test.mode
+        let act = await runTest({}, "John", true, env)
         act.should.eql({
           stdout: `promptinput.notification.failure (${test.code})`,
           title: "promptinput.label.defaultprompt",
@@ -324,8 +327,8 @@ describe("node-red-contrib-promptinput", function () {
       })
     })
     it("Authorization", async function () {
-      process.env["__PDI_TEST__"] = "1"
-      let act = await runTest({}, "John", true, true)
+      let env = { __PDI_TEST__: "1" }
+      let act = await runTest({}, "John", true, env, true)
       act.should.eql({
         stdout: `promptinput.notification.authorization (401)`,
         title: "promptinput.label.defaultprompt",
@@ -335,20 +338,20 @@ describe("node-red-contrib-promptinput", function () {
   })
   describe("Runtime errors", function () {
     it("Wrong Boolean data type", async function () {
-      process.env["__PDI_TEST__"] = "1"
-      await runTest({}, "bool:John", true)
+      let env = { __PDI_TEST__: "1" }
+      await runTest({}, "bool:John", true, env)
       const act = getError(stdout)
       act.should.equal("promptinput.errors.boolean")
     })
     it("Cannot convert to number", async function () {
-      process.env["__PDI_TEST__"] = "1"
-      await runTest({}, "num:A", true)
+      let env = { __PDI_TEST__: "1" }
+      await runTest({}, "num:A", true, env)
       const act = getError(stdout)
       act.should.equal("promptinput.errors.number")
     })
     it("General conversion error", async function () {
-      process.env["__PDI_TEST__"] = "1"
-      await runTest({}, "obj:A", true)
+      let env = { __PDI_TEST__: "1" }
+      await runTest({}, "obj:A", true, env)
       const act = getError(stdout)
       act.should.equal("promptinput.errors.conversion")
     })
