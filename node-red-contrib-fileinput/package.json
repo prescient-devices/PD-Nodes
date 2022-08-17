@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-fileinput",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Asks user to select a file from the browser's file sytem and then emits its contents as a message or messages if the streaming option is selected",
   "scripts": {
     "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""

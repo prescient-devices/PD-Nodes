@@ -71,7 +71,7 @@
               await new Promise(function (resolve, reject) {
                 $.ajax({
                   type: "POST",
-                  url: `/node-red-contrib-fileinput/file/${globalId}`,
+                  url: `node-red-contrib-fileinput/file/${globalId}`,
                   headers: {
                     Accept: "application/json",
                     "Content-type": "application/json",
@@ -94,7 +94,7 @@
               return
             }
             const request = new Request(
-              `/node-red-contrib-fileinput/file/${globalId}`,
+              `node-red-contrib-fileinput/file/${globalId}`,
               {
                 method: "POST",
                 body: fileBlob,
