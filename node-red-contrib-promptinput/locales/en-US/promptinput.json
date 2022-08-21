@@ -3,8 +3,9 @@
     "errors": {
       "boolean": "Input value is not recognized as Boolean",
       "conversion": "Cannot convert user input to selected data type",
+      "failed": "Failed to create message with user input\n__error__",
       "number": "Cannot convert user input to number",
-      "failed": "Failed to create message with user input\n__error__"
+      "property": "Illegal property specification"
     },
     "label": {
       "datatype": "Data type",

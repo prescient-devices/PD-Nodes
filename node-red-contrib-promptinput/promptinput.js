@@ -47,7 +47,7 @@ module.exports = function (RED) {
     node.on("input", function (inMsg) {
       node.status({})
       let payload = inMsg.payload
-      const prop = config.property
+      let prop = config.property
       let type = config.datatype
       for (const item of ["str", "num", "obj", "bool", "buf"]) {
         if (payload.trim().toLowerCase().startsWith(`${item}:`)) {
@@ -56,8 +56,17 @@ module.exports = function (RED) {
           break
         }
       }
-      let outMsg = {}
-      outMsg[prop] = payload
+      const props = prop.split(".").map((item) => item.trim())
+      if (props.some((item) => !item)) {
+        return node.error(errorMsg("promptinput.errors.property"))
+      }
+      let obj = {}
+      let outMsg = obj
+      for (let prop of props.slice(0, -1)) {
+        outMsg[prop] = {}
+        outMsg = outMsg[prop]
+      }
+      prop = props.slice(-1)[0]
       try {
         if (type === "obj") {
           outMsg[prop] = JSON.parse(payload)
@@ -81,7 +90,8 @@ module.exports = function (RED) {
         console.log(error)
         return node.error(errorMsg("promptinput.errors.conversion"))
       }
-      node.send(outMsg)
+      console.log(JSON.stringify(obj))
+      node.send(obj)
     })
   }
   RED.nodes.registerType("promptinput", PromptInput)

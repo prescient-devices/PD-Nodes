@@ -24,6 +24,7 @@ function _capitalize(arg) {
 
 function getFlow(filename, config) {
   config = config || {}
+  const property = config.property || "payload"
   let flowArray = [
     {
       id: "7950429b416904f2",
@@ -54,7 +55,7 @@ function getFlow(filename, config) {
       name: "Prompt input",
       datatype: config.datatype || "str",
       prompt: config.prompt || null,
-      property: config.property || "payload",
+      property: property,
       propertyType: "msg",
       x: 130,
       y: 80,
@@ -65,7 +66,7 @@ function getFlow(filename, config) {
       type: "function",
       z: "7950429b416904f2",
       name: "Process input",
-      func: `msg.filename = '${filename}'\nmsg.payload = JSON.stringify({\n    type: typeof msg.payload,\n    value: msg.payload\n})\nreturn msg`,
+      func: `msg.filename = '${filename}'\nmsg.payload = JSON.stringify({\n    type: typeof msg.${property},\n    value: msg.${property}\n})\nreturn msg`,
       outputs: 1,
       noerr: 0,
       initialize: "",
@@ -248,10 +249,25 @@ describe("node-red-contrib-promptinput", function () {
     } catch (_) {}
     rimraf.sync(testDir)
   })
+  it("Nested property", async function () {
+    let env = {}
+    env["__PDI_TEST__"] = "1"
+    let config = { property: "payload.city.name" }
+    const msg = "Hello world"
+    const act = await runTest(config, msg, false, env)
+    act.should.eql({
+      stdout: "promptinput.notification.success",
+      title: "promptinput.label.default_prompt",
+      msg: {
+        type: "string",
+        value: msg,
+      },
+    })
+  })
   describe("Dialog title", function () {
     const tests = [
       { desc: "Custom", prompt: "My window" },
-      { desc: "Default", ref: "promptinput.label.defaultprompt" },
+      { desc: "Default", ref: "promptinput.label.default_prompt" },
     ]
     tests.forEach(function (testObj) {
       it(testObj.desc, async function () {
@@ -297,7 +313,7 @@ describe("node-red-contrib-promptinput", function () {
             let act = await runTest(config, input)
             act.should.eql({
               stdout: "promptinput.notification.success",
-              title: "promptinput.label.defaultprompt",
+              title: "promptinput.label.default_prompt",
               msg: {
                 type: testObj.refType || testObj.longType,
                 value: testObj.refinput || testObj.input,
@@ -321,7 +337,7 @@ describe("node-red-contrib-promptinput", function () {
         let act = await runTest({}, "John", true, env)
         act.should.eql({
           stdout: `promptinput.notification.failure (${test.code})`,
-          title: "promptinput.label.defaultprompt",
+          title: "promptinput.label.default_prompt",
           msg: "",
         })
       })
@@ -331,7 +347,7 @@ describe("node-red-contrib-promptinput", function () {
       let act = await runTest({}, "John", true, env, true)
       act.should.eql({
         stdout: `promptinput.notification.authorization (401)`,
-        title: "promptinput.label.defaultprompt",
+        title: "promptinput.label.default_prompt",
         msg: "",
       })
     })
@@ -354,6 +370,12 @@ describe("node-red-contrib-promptinput", function () {
       await runTest({}, "obj:A", true, env)
       const act = getError(stdout)
       act.should.equal("promptinput.errors.conversion")
+    })
+    it("Illegal property", async function () {
+      let env = { __PDI_TEST__: "1" }
+      await runTest({ property: "payload.city.....name" }, "Hello", true, env)
+      const act = getError(stdout)
+      act.should.equal("promptinput.errors.property")
     })
   })
 })
