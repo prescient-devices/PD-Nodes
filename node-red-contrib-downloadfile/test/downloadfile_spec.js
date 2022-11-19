@@ -17,8 +17,6 @@ const should = require("should")
 // Node-RED imports
 const helper = require("node-red-node-test-helper")
 const { spawn, spawnSync } = require("child_process")
-const { agent } = require("supertest")
-const { allowedNodeEnvironmentFlags } = require("process")
 const nodeRedNodesDir = path.resolve(
   __dirname,
   "..",
