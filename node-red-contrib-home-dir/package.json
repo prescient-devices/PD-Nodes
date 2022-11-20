@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-home-dir",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Returns Node-RED home directory",
   "main": "index.js",
   "scripts": {

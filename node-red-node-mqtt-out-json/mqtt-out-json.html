@@ -65,7 +65,8 @@
 
 <script type="text/javascript">
   RED.nodes.registerType("mqtt out JSON", {
-    category: "pdlib",
+    category: "prescient",
+    color: "rgb(74, 179, 255)",
     defaults: {
       name: { value: "" },
       topic: { value: "" },
@@ -75,7 +76,6 @@
       ignoreempty: { value: true },
       wholemsg: { value: true },
     },
-    color: "#d8bfd8",
     inputs: 1,
     outputs: 0,
     icon: "bridge.svg",

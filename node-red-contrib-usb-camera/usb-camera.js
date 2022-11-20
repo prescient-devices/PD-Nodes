@@ -186,7 +186,6 @@ module.exports = function (RED) {
             delay: parseInt(config.delay),
             saveShots: true,
             output: config.format === "png" ? "png" : "jpeg",
-            device: false,
             callbackReturn: {
               template: "base64",
               encode: "base64",
