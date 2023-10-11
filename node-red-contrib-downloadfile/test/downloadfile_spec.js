@@ -12,7 +12,6 @@ const path = require("path")
 // npm imports
 const clone = require("clone")
 const puppeteer = require("puppeteer")
-const rimraf = require("rimraf")
 const should = require("should")
 // Node-RED imports
 const helper = require("node-red-node-test-helper")
@@ -24,12 +23,9 @@ const nodeRedNodesDir = path.resolve(
   "@node-red",
   "nodes"
 )
-const InjectNode = require(path.resolve(
-  nodeRedNodesDir,
-  "core",
-  "common",
-  "20-inject.js"
-))
+const InjectNode = require(
+  path.resolve(nodeRedNodesDir, "core", "common", "20-inject.js")
+)
 // Local imports
 const DownloadFileNode = require(path.resolve(__dirname, "..", "downloadfile.js"))
 
@@ -111,7 +107,7 @@ describe("node-red-contrib-downloadfile", function () {
           ".bin",
           "node-red"
         )
-        rimraf.sync(testDir)
+        fs.rmSync(testDir, { recursive: true, force: true })
         fs.mkdirSync(testDir, { recursive: true })
         fs.writeFileSync(
           path.resolve(testDir, "flows.json"),
@@ -169,11 +165,11 @@ describe("node-red-contrib-downloadfile", function () {
       try {
         execObj.kill()
       } catch (_) {}
-      rimraf.sync(testDir)
+      fs.rmSync(testDir, { recursive: true, force: true })
     })
     it("Download message", async function () {
       const browser = await puppeteer.launch({
-        headless: true,
+        headless: "new",
         args: ["--user-agent=__pdi-test-puppeteer__"],
       })
       const page = await browser.newPage()

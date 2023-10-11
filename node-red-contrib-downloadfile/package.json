@@ -21,17 +21,16 @@
     "url": "https://github.com/prescient-devices/PD-Nodes/issues"
   },
   "engines": {
-    "node": ">=12.0.0"
+    "node": ">=16.0.0"
   },
   "devDependencies": {
-    "chai": "^4.3.6",
+    "chai": "^4.3.10",
     "clone": "^2.1.2",
-    "jshint": "^2.13.5",
-    "mocha": "^8.4.0",
-    "node-red": "^2.2.2",
-    "node-red-node-test-helper": "^0.2.7",
-    "prettier": "^2.7.1",
-    "puppeteer": "^15.5.0",
-    "rimraf": "^3.0.2"
+    "jshint": "^2.13.6",
+    "mocha": "^10.2.0",
+    "node-red": "^3.1.0",
+    "node-red-node-test-helper": "^0.3.2",
+    "prettier": "^3.0.3",
+    "puppeteer": "^21.3.8"
   }
 }
