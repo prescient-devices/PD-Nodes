@@ -18,7 +18,7 @@
 </script>
 
 <script type="text/javascript">
-  ;(function () {
+  ; (function () {
     let globalEncodings = [
       [
         "downloadfile.encoding.native",
@@ -142,15 +142,13 @@
         const data = payload.data || ""
         const encoding = payload.encoding || "utf-8"
         let obj
+        const attr = encoding === "base64" ? `${encoding},${data}` : `charset=${encoding},${encodeURIComponent(data)}`
         try {
           obj = document.createElement("a")
-          obj.setAttribute(
-            "href",
-            "data:text/plain;charset=" + encoding + "," + encodeURIComponent(data)
-          )
+          obj.setAttribute("href", `data:text/plain;${attr}`)
           obj.setAttribute("download", fname)
           obj.click()
-        } catch (_) {}
+        } catch (_) { }
         obj && obj.remove()
       }
     })

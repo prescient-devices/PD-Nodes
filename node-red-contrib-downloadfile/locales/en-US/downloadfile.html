@@ -3,9 +3,13 @@
 -->
 <script type="text/html" data-help-name="downloadfile">
     <p>Writes <code>msg.payload</code> to a file in the browser's file system.
-    If <code>msg.payload</code> is not a string it is converted to one with the
-    <code>JSON.stringify</code> function.
+    If <code>msg.payload</code> is a buffer it is treated as binary data,
+    otherwise if <code>msg.payload</code> is not a string it is converted to one
+    with the <code>JSON.stringify</code> function. The encoding options is used
+    for string and string-converted payloads.
+
     <h3>Inputs</h3>
+
     <dl class="message-properties">
         <dt class="optional">filename <span class="property-type">string</span></dt>
         <dd>If not configured in the node, this optional property sets the name of the file to use.</dd>

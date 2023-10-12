@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-downloadfile",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "Opens web browser file save dialog and saves the payload received to a file in the local filesystem",
   "scripts": {
     "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
@@ -28,6 +28,7 @@
     "clone": "^2.1.2",
     "jshint": "^2.13.6",
     "mocha": "^10.2.0",
+    "node-netstat": "^1.8.0",
     "node-red": "^3.1.0",
     "node-red-node-test-helper": "^0.3.2",
     "prettier": "^3.0.3",

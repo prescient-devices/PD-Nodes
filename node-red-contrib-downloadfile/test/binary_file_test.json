@@ -1,0 +1,85 @@
+[
+    {
+        "id": "f7245037016873f4",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "49bfa6dbf805cd7a",
+        "type": "inject",
+        "z": "f7245037016873f4",
+        "name": "Read binary file",
+        "props": [
+            {
+                "p": "filename",
+                "v": "TEST-DIR/binfile.tar.gz",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "trigger": true,
+        "x": 130,
+        "y": 60,
+        "wires": [
+            [
+                "399f64c4d71a563b"
+            ]
+        ]
+    },
+    {
+        "id": "399f64c4d71a563b",
+        "type": "file in",
+        "z": "f7245037016873f4",
+        "name": "",
+        "filename": "",
+        "format": "",
+        "chunk": false,
+        "sendError": false,
+        "encoding": "none",
+        "allProps": false,
+        "x": 320,
+        "y": 60,
+        "wires": [
+            [
+                "09d1d8f928a00f3d"
+            ]
+        ]
+    },
+    {
+        "id": "af1938b08c19b135",
+        "type": "downloadfile",
+        "z": "f7245037016873f4",
+        "name": "Download to local file system",
+        "filename": "test_binary_file.tar.gz",
+        "encoding": "none",
+        "x": 630,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "09d1d8f928a00f3d",
+        "type": "function",
+        "z": "f7245037016873f4",
+        "name": "Filter",
+        "func": "msg = { payload: msg.payload }\nreturn msg\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 470,
+        "y": 60,
+        "wires": [
+            [
+                "af1938b08c19b135"
+            ]
+        ]
+    }
+]

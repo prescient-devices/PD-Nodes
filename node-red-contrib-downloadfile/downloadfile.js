@@ -20,13 +20,16 @@ module.exports = function (RED) {
         node.warn(RED._("warn.no_payload"))
         return
       }
-      const encoding =
+      let encoding =
         config.encoding === "none"
           ? "utf-8"
           : config.encoding === "setbymsg"
           ? msg.encoding || "utf-8"
           : config.encoding
-      if (typeof msg.payload !== "string") {
+      if (Buffer.isBuffer(msg.payload)) {
+        encoding = "base64"
+        msg.payload = msg.payload.toString(encoding)
+      } else if (typeof msg.payload !== "string") {
         try {
           msg.payload = JSON.stringify(msg.payload, encoding)
         } catch (_) {
