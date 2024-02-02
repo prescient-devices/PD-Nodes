@@ -90,7 +90,6 @@ module.exports = function (RED) {
         console.log(error)
         return node.error(errorMsg("promptinput.errors.conversion"))
       }
-      console.log(JSON.stringify(obj))
       node.send(obj)
     })
   }

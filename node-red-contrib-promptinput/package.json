@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-promptinput",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Emits an output message based on user input entered via browser's prompt.",
   "scripts": {
     "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
