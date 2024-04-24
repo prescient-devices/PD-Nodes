@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-promptinput",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "Emits an output message based on user input entered via browser's prompt.",
   "scripts": {
     "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
@@ -23,6 +23,9 @@
   "engines": {
     "node": ">=12.0.0"
   },
+  "dependencies": {
+    "jsonata": "^2.0.4"
+  },
   "devDependencies": {
     "@playwright/test": "^1.43.1",
     "@types/node": "^20.12.7",
@@ -34,7 +37,14 @@
     "prettier": "^2.7.1",
     "rimraf": "^3.0.2"
   },
-  "dependencies": {
-    "jsonata": "^2.0.4"
-  }
+  "files": [
+    "package.json",
+    "LICENSE",
+    "README.md",
+    "examples/Ask for name.json",
+    "promptinput.html",
+    "locales/en-US/promptinput.json",
+    "locales/en-US/promptinput.html",
+    "promptinput.js"
+  ]
 }
