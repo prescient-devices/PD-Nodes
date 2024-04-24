@@ -1,6 +1,6 @@
 {
   "name": "@prescient-devices/node-red-contrib-promptinput",
-  "version": "1.0.8",
+  "version": "1.1.0",
   "description": "Emits an output message based on user input entered via browser's prompt.",
   "scripts": {
     "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
@@ -24,13 +24,17 @@
     "node": ">=12.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.43.1",
+    "@types/node": "^20.12.7",
     "chai": "^4.3.6",
     "clone": "^2.1.2",
     "jshint": "^2.13.5",
     "mocha": "^8.4.0",
     "node-red": "^2.2.2",
     "prettier": "^2.7.1",
-    "puppeteer": "^16.1.0",
     "rimraf": "^3.0.2"
+  },
+  "dependencies": {
+    "jsonata": "^2.0.4"
   }
 }

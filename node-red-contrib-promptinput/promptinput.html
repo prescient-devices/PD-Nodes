@@ -26,17 +26,84 @@
          <option value="buf" data-i18n="promptinput.type_options.buf"></option>
        </select>
    </div>
+   <div class="form-row">
+       <label for="node-input-typed-validation"><i class="fa fa-check-circle-o" style="width: 20px;"></i> <span data-i18n="promptinput.label.validation"></span></label>
+       <input type="text" id="node-input-typed-validation" style="width: 339.19px;">
+       <input id="node-input-validation" type="hidden">
+       <input id="node-input-validationType" type="text" type="hidden">
+   </div>
 </script>
 
 <script type="text/javascript">
   ; (function () {
-    let globalId = null
-    let globalFileInFlight = false
-    const globalIsInTest = window.navigator.userAgent === "__pdi-test-puppeteer__"
+    const globalIsInTest = window.navigator.userAgent === "__pdi-test__"
     function validProperty(arg) {
       arg = arg || "payload"
       const props = arg.split(".").map((item) => item.trim())
       return !props.some((item) => !item)
+    }
+    async function processClick(event, overrides) {
+      const notifyMsg = (arg) => globalIsInTest ? arg : node._(arg)
+      const { id, prompt: runtimePrompt } = overrides || {}
+      let node = id ? RED.nodes.node(id) : this
+      const nodeId = id || node.id
+      const tmp = runtimePrompt || node.prompt
+      const promptText =
+        typeof tmp === "string" && tmp.trim()
+          ? tmp
+          : notifyMsg("promptinput.label.default_prompt", { id: nodeId })
+      const input = prompt(promptText)
+      if (input === null || (typeof input === "string" && !input.trim())) {
+        return
+      }
+      $.ajax({
+        type: "POST",
+        url: `node-red-contrib-promptinput/prompt/${nodeId}`,
+        headers: {
+          Accept: "application/json",
+          "Content-type": "application/json",
+        },
+        data: JSON.stringify({ input }),
+        datatype: "json",
+        success: function () {
+          const msg = notifyMsg("promptinput.notification.success")
+          globalIsInTest && console.log(`promptinput: ${msg}`)
+          RED.notify(msg, {
+            type: "success",
+            id: "promptinput",
+            timeout: 2000,
+          })
+        },
+        error: function (jqXHR, textStatus, errorThrown) {
+          const code = jqXHR.status
+          const msg = notifyMsg(code === 401 ? "promptinput.notification.authorization" : "promptinput.notification.failure")
+          globalIsInTest && console.log(`promptinput: ${msg} (${jqXHR.status})`)
+          RED.notify(msg, "error")
+        },
+      })
+    }
+    RED.comms.subscribe("notification/#", async function (topic, payload) {
+      const sentinel = "notification/PROMPT-INPUT-"
+      if (topic.startsWith(sentinel)) {
+        const id = topic.slice(sentinel.length).trim()
+        const { prompt } = payload
+        await processClick(null, { id, prompt })
+      }
+    })
+    const ejsonata = {
+      value: "ejsonata",
+      label: "expression",
+      icon: "red/images/typedInput/expr.svg",
+      validate: function (v) { try { if (!v.trim()) { return true }; jsonata(v); return true; } catch (e) { return false; } },
+      expand: function () {
+        var that = this;
+        RED.editor.editExpression({
+          value: this.value().replace(/\t/g, "\n"),
+          complete: function (v) {
+            that.value(v.replace(/\n/g, "\t"));
+          }
+        })
+      }
     }
     RED.nodes.registerType("promptinput", {
       category: "prescient",
@@ -47,71 +114,49 @@
         prompt: { value: "" },
         property: { value: "payload", required: true, validate: validProperty },
         propertyType: { value: "msg" },
+        validation: { value: "", required: false },
+        validationType: { value: "ejsonata", required: false },
       },
-      inputs: 0,
+      inputs: 1,
       outputs: 1,
       icon: "font-awesome/fa-question",
       label: function () {
         return this.name || "prompt input"
       },
-      button: {
-        onclick: async function (obj) {
-          const notifyMsg = (arg) => globalIsInTest ? arg : node._(arg)
-          globalId = this.id
-          let node = this
-          const promptText =
-            typeof this.prompt === "string" && this.prompt.trim()
-              ? this.prompt
-              : notifyMsg("promptinput.label.default_prompt", { id: globalId })
-          const input = prompt(promptText)
-          if (!input.trim()) {
-            return
-          }
-          $.ajax({
-            type: "POST",
-            url: `node-red-contrib-promptinput/prompt/${globalId}`,
-            headers: {
-              Accept: "application/json",
-              "Content-type": "application/json",
-            },
-            data: JSON.stringify({ input }),
-            datatype: "json",
-            success: function () {
-              const msg = notifyMsg("promptinput.notification.success")
-              globalIsInTest && console.log(`promptinput: ${msg}`)
-              RED.notify(msg, {
-                type: "success",
-                id: "promptinput",
-                timeout: 2000,
-              })
-            },
-            error: function (jqXHR, textStatus, errorThrown) {
-              const code = jqXHR.status
-              const msg = notifyMsg(code === 401 ? "promptinput.notification.authorization" : "promptinput.notification.failure")
-              globalIsInTest && console.log(`promptinput: ${msg} (${jqXHR.status})`)
-              RED.notify(msg, "error")
-            },
-          })
-        },
-      },
+      button: { onclick: processClick, },
       oneditprepare: function () {
         $("#node-input-typed-property").typedInput({
           default: "msg",
           types: ["msg"],
           typeField: $("#node-input-propertyType"),
         })
-        let property =
+        const property =
           !this.property || this.property === "false" ? "payload" : this.property + ""
         $("#node-input-typed-property").typedInput("type", "msg")
         $("#node-input-typed-property").typedInput("value", property)
         $("#node-input-typed-property").on("change", function () {
-          let type = $("#node-input-typed-property").typedInput("type")
+          const type = $("#node-input-typed-property").typedInput("type")
           let value = $("#node-input-typed-property").typedInput("value")
           if (type === "msg" && value === "") {
             value = "payload"
             $("#node-input-typed-property").typedInput("value", value)
           }
           value = $("#node-input-property").val(value)
+        })
+        $("#node-input-typed-validation").typedInput({
+          default: "ejsonata",
+          types: [ejsonata],
+          typeField: $("#node-input-validationType"),
+        })
+        const validation = !this.validation ? "" : this.validation
+        $("#node-input-typed-validation").typedInput("type", "ejsonata")
+        $("#node-input-typed-validation").typedInput("value", validation)
+        $("#node-input-typed-validation").on("change", function () {
+          const type = $("#node-input-typed-validation").typedInput("type")
+          const value = $("#node-input-typed-validation").typedInput("value")
+          if (type === "ejsonata") {
+            value = $("#node-input-validation").val(value)
+          }
         })
       },
     })

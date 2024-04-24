@@ -3,18 +3,50 @@
 -->
 <script type="text/html" data-help-name="promptinput">
   <p>Emits an output message based on user input entered via browser's prompt.</p>
+  <h3>Inputs</h3>
+  <dl class="message-properties">
+    <dt class="optional">prompt<span class="property-type">string</span></dt>
+    <dd>
+      Prompt dialog window header.
+    </dd>
+  </dl>
+  <dl class="message-properties">
+    <dt class="optional">type<span class="property-type">string</span></dt>
+    <dd>
+      Data type to convert user input into (case insensitive), one of
+      <code>str</code> (string), <code>num</code> (number), <code>obj</code>
+      (object), <code>bool</code> (Boolean), or <code>buf</code> (buffer). This
+      message property overrides the data type specified in the node's user
+      interface, but is overridden by the data type specified in the user input.
+    </dd>
+  </dl>
+  <dl class="message-properties">
+    <dt class="optional">validation<span class="property-type">string</span></dt>
+    <dd>
+      JSONata expression to be used in validating the user input. A falsy value
+      inhibits the emission of an output message.
+    </dd>
+  </dl>
   <h3>Outputs</h3>
   <dl class="message-properties">
     <dt class="optional">[user-defined]<span class="property-type">various</span></dt>
     <dd>
-      A message property defined in the node configuration outputs the user input; its
-      data type may be string, number, object, Boolean or buffer.
+      A message property defined in the node configuration contains the user
+      input; converted to the desired data type ( string, number, object,
+      Boolean, or buffer.)
     </dd>
   </dl>
   <h3>Details</h3>
   <p>
-    After clicking the input button the user is prompted for input, which is then
-    converted to the configured data type by default
+    After clicking the node's button, the user is prompted for input, which is then
+    converted to the configured data type.
+  </p>
+  <p>
+    Alternatively, the user may be prompted when the node receives an input
+    message. If the input is valid (either not falsy or passes an optional
+    JSONata validation function), then the user input (converted to the selected
+    data type) is added to the received message in the selected message
+    property.
   </p>
   <p>
     The output data type may be overridden by prepending the input with
@@ -26,7 +58,8 @@
   </p>
   <p>
     The prompt dialog window header may be optionally provided in the node's
-    configuration, otherwise the default is <code>Enter property value</code>.
+    configuration, or via the input message <code>msg.prompt</code>, otherwise
+    the default is <code>Enter property value</code>.
   </p>
   <p>
     The output property may be nested, for example <code>payload.city.name</code>.

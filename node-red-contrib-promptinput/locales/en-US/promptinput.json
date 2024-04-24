@@ -5,14 +5,19 @@
       "conversion": "Cannot convert user input to selected data type",
       "failed": "Failed to create message with user input\n__error__",
       "number": "Cannot convert user input to number",
-      "property": "Illegal property specification"
+      "property": "Illegal property specification",
+      "type_ignored": "Message type __type__ not supported",
+      "validation": "Invalid JSONata validation expression",
+      "validation_disabled": "Invalid JSONata validation expression, input disabled",
+      "validation_evaluation": "Error validating input"
     },
     "label": {
       "datatype": "Data type",
       "default_prompt": "Enter property value [node id __id__]",
       "name": "Name",
       "prompt": "Prompt",
-      "property": "Property"
+      "property": "Property",
+      "validation": "Validation"
     },
     "notification": {
       "authorization": "Not authorized to use node",
@@ -25,6 +30,10 @@
       "num": "Number",
       "obj": "Object",
       "str": "String"
+    },
+    "validation": {
+      "false": "Validation failed",
+      "true": "Validation succeeded"
     }
   }
 }

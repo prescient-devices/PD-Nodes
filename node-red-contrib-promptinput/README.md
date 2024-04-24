@@ -1,8 +1,10 @@
 node-red-contrib-promptinput
 ============================
 
-A node that once its buttons is pressed, prompts user for input and emits a
-message with that input.
+A node that once its button is pressed or it receives a message, prompts the
+user for input and emits a message with that input converted to a desired data
+type. An optional JSONata expression can be used to validate the input and emit
+a message only when the validation succeeds.
 
 ### Installation
 
