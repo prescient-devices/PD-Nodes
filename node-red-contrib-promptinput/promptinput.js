@@ -89,6 +89,7 @@ module.exports = function (RED) {
       let expression = node.expression
       if (receivedMsg && receivedMsg.__expression) {
         expression = receivedMsg.__expression
+        delete receivedMsg.__expression
       }
       if (expression === null) {
         return node.warn(errorMsg("promptinput.errors.validation_disabled"))
