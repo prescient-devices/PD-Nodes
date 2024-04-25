@@ -28,7 +28,7 @@ module.exports = function (RED) {
     "/node-red-contrib-promptinput/prompt/:id",
     RED.auth.needsPermission("node-red-contrib-promptinput.write"),
     function (req, res) {
-      let node = RED.nodes.getNode(req.params.id)
+      const node = RED.nodes.getNode(req.params.id)
       if (!node || globalFailMode === "NO-NODE") {
         return res.sendStatus(404)
       }
@@ -36,11 +36,12 @@ module.exports = function (RED) {
         if (globalFailMode === "MESSAGE") {
           throw new Error("Message error")
         }
-        if (req.body) {
-          let msg = { __msgSrc: "editor", payload: req.body.input || "" }
+        if (req.body && typeof req.body.input === "string") {
+          const msg = { __msgSrc: "editor", __userInput: req.body.input || "" }
           node.receive(msg)
           return res.sendStatus(200)
         }
+        return res.sendStatus()
       } catch (error) {
         signalError(node, "promptinput.errors.failed", { error: error.toString() })
         res.sendStatus(500)
@@ -95,7 +96,11 @@ module.exports = function (RED) {
         return node.warn(errorMsg("promptinput.errors.validation_disabled"))
       }
       node.status({})
-      let payload = inMsg.payload
+      let userInput = inMsg.__userInput
+      delete inMsg.__userInput
+      if (typeof userInput !== "string") {
+        return node.error(errorMsg("promptinput.errors.user_input"))
+      }
       let prop =
         receivedMsg && hasValidStringProp(receivedMsg, "prop")
           ? receivedMsg.prop.trim()
@@ -111,9 +116,9 @@ module.exports = function (RED) {
         }
       }
       for (const item of validTypes) {
-        if (payload.trim().toLowerCase().startsWith(`${item}:`)) {
+        if (userInput.trim().toLowerCase().startsWith(`${item}:`)) {
           type = item
-          payload = payload.slice(item.length + 1)
+          userInput = userInput.slice(item.length + 1)
           break
         }
       }
@@ -131,22 +136,22 @@ module.exports = function (RED) {
       let pass = true
       try {
         if (type === "obj") {
-          outMsg[prop] = JSON.parse(payload)
+          outMsg[prop] = JSON.parse(userInput)
         } else if (type === "buf") {
-          outMsg[prop] = Buffer.from(payload)
+          outMsg[prop] = Buffer.from(userInput)
         } else if (type === "num") {
-          outMsg[prop] = Number(payload)
+          outMsg[prop] = Number(userInput)
           if (isNaN(outMsg[prop])) {
             return node.error(errorMsg("promptinput.errors.number"))
           }
         } else if (type === "bool") {
-          const tmp = payload.toString().trim().toLowerCase()
+          const tmp = userInput.toString().trim().toLowerCase()
           if (!["true", "false", "0", "1"].includes(tmp)) {
             return node.error(errorMsg("promptinput.errors.boolean"))
           }
           outMsg[prop] = Boolean(["1", "true"].includes(tmp))
         } else {
-          outMsg[prop] = payload.toString()
+          outMsg[prop] = userInput.toString()
         }
         if (expression) {
           pass = false

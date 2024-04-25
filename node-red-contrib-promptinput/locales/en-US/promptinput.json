@@ -7,6 +7,7 @@
       "number": "Cannot convert user input to number",
       "property": "Illegal property specification",
       "type_ignored": "Message type __type__ not supported",
+      "user_input": "Error getting user input from editor",
       "validation": "Invalid JSONata validation expression",
       "validation_disabled": "Invalid JSONata validation expression, input disabled",
       "validation_evaluation": "Error validating input"
