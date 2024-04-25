@@ -1,0 +1,99 @@
+[
+    {
+        "id": "7950429b416904f2",
+        "type": "tab",
+        "label": "Ask two questions",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "0d357a1b7ed4c9a3",
+        "type": "promptinput",
+        "z": "7950429b416904f2",
+        "name": "Get user name",
+        "datatype": "str",
+        "prompt": "What is your name?",
+        "property": "name",
+        "propertyType": "msg",
+        "validation": "",
+        "validationType": "ejsonata",
+        "x": 140,
+        "y": 40,
+        "wires": [
+            [
+                "8bbd9efb8fb10f7c"
+            ]
+        ]
+    },
+    {
+        "id": "8bbd9efb8fb10f7c",
+        "type": "change",
+        "z": "7950429b416904f2",
+        "name": "Next question config",
+        "rules": [
+            {
+                "t": "set",
+                "p": "prompt",
+                "pt": "msg",
+                "to": "\"Are you sure, \" & msg.name & \"?\"",
+                "tot": "jsonata"
+            },
+            {
+                "t": "set",
+                "p": "validation",
+                "pt": "msg",
+                "to": "$uppercase(answer) = \"YES\"",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 360,
+        "y": 40,
+        "wires": [
+            [
+                "4c0833fee19888a2"
+            ]
+        ]
+    },
+    {
+        "id": "4c0833fee19888a2",
+        "type": "promptinput",
+        "z": "7950429b416904f2",
+        "name": "Confirm",
+        "datatype": "str",
+        "prompt": "",
+        "property": "answer",
+        "propertyType": "msg",
+        "validation": "",
+        "validationType": "ejsonata",
+        "x": 580,
+        "y": 40,
+        "wires": [
+            [
+                "267464180074178b"
+            ]
+        ]
+    },
+    {
+        "id": "267464180074178b",
+        "type": "debug",
+        "z": "7950429b416904f2",
+        "name": "User is sure",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "answer",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 750,
+        "y": 40,
+        "wires": []
+    }
+]

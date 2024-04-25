@@ -12,6 +12,7 @@ const path = require("path")
 // npm imports
 const clone = require("clone")
 const { firefox } = require("playwright")
+const freePort = require("find-free-port")
 const should = require("chai").should()
 // Node-RED imports
 const { spawn, spawnSync } = require("child_process")
@@ -25,12 +26,17 @@ function _capitalize(arg) {
 
 function getFlow(filename, config) {
   config = config || {}
-  let { property, validation, promptOveride, validationOverride, typeOverride } = config
-  property = property || "payload"
-  validation = validation || ""
-  promptOveride = promptOveride || ""
-  validationOverride = validationOverride || ""
-  typeOverride = typeOverride || ""
+  let {
+    datatype = "str",
+    prompt = null,
+    property = "payload",
+    validation = "",
+    propOverride = "",
+    promptOverride = "",
+    validationOverride = "",
+    typeOverride = "",
+  } = config
+  const filterProp = propOverride || property
   const flowArray = [
     {
       id: "7950429b416904f2",
@@ -47,8 +53,13 @@ function getFlow(filename, config) {
       name: "Overrides",
       props: [
         {
+          p: "prop",
+          v: propOverride,
+          vt: "str",
+        },
+        {
           p: "prompt",
-          v: promptOveride,
+          v: promptOverride,
           vt: "str",
         },
         {
@@ -93,8 +104,8 @@ function getFlow(filename, config) {
       type: "promptinput",
       z: "7950429b416904f2",
       name: "Prompt input",
-      datatype: config.datatype || "str",
-      prompt: config.prompt || null,
+      datatype,
+      prompt,
       property: property,
       propertyType: "msg",
       validation: validation,
@@ -108,7 +119,7 @@ function getFlow(filename, config) {
       type: "function",
       z: "7950429b416904f2",
       name: "Process input",
-      func: `msg.filename = '${filename}'\nmsg.payload = JSON.stringify({\n    type: typeof msg.${property},\n    value: msg.${property}\n})\nreturn msg`,
+      func: `msg.filename = '${filename}'\nmsg.payload = JSON.stringify({\n    type: typeof msg.${filterProp},\n    value: msg.${filterProp}\n})\nreturn msg`,
       outputs: 1,
       noerr: 0,
       initialize: "",
@@ -153,6 +164,19 @@ function getFlow(filename, config) {
   return flowArray
 }
 
+async function getPort(minPort) {
+  let ports
+  try {
+    ports = await freePort(minPort || 1882)
+  } catch (error) {
+    return console.error(error)
+  }
+  if (!ports || ports.length === 0) {
+    return console.error("Could not find a free port")
+  }
+  return parseInt(ports[0])
+}
+
 function delay(ms) {
   return new Promise(function (resolve) {
     let timer = setTimeout(() => {
@@ -191,13 +215,20 @@ async function handlePrompt(page, msg) {
   })
 }
 
-// Tests
-describe("node-red-contrib-promptinput", function () {
-  let execObj, stdout
-  const testDir = path.resolve(__dirname, ".node-red")
-  const outputFile = path.resolve(testDir, "output.json")
-  function startNodeRed(config, env, readOnly) {
-    const debug = false
+class NodeRED {
+  constructor(config, env, readOnly, port) {
+    this.config = config
+    this.env = env
+    this.readOnly = readOnly
+    this.port = port
+    this.testDir = path.resolve(__dirname, `.node-red-${port}`)
+    this.outputFile = path.resolve(this.testDir, "output.json")
+    this.debug = false
+    this.stdout = ""
+    this.execObj = null
+  }
+  start() {
+    const that = this
     return new Promise(function (resolve) {
       const nodeRedBin = path.resolve(
         __dirname,
@@ -207,29 +238,29 @@ describe("node-red-contrib-promptinput", function () {
         "node-red"
       )
       try {
-        fs.rmSync(testDir, { recursive: true })
+        fs.rmSync(that.testDir, { recursive: true })
       } catch (_) {}
-      fs.mkdirSync(testDir, { recursive: true })
+      fs.mkdirSync(that.testDir, { recursive: true })
       fs.writeFileSync(
-        path.resolve(testDir, "flows.json"),
-        JSON.stringify(getFlow(outputFile, config), null, 2)
+        path.resolve(that.testDir, "flows.json"),
+        JSON.stringify(getFlow(that.outputFile, that.config), null, 2)
       )
       spawnSync("npm", [
         "install",
         "--production",
         "--prefix",
-        path.resolve(testDir),
+        path.resolve(that.testDir),
         path.resolve(__dirname, ".."),
       ])
       let settings = {}
-      const settingsFile = path.resolve(testDir, "settings.js")
+      const settingsFile = path.resolve(that.testDir, "settings.js")
       if (fs.existsSync(settingsFile)) {
         settings = require(settingsFile)
       }
       settings.editorTheme = settings.editorTheme || {}
       settings.editorTheme.tours = false
       settings.flowFile = "flows.json"
-      if (readOnly) {
+      if (that.readOnly) {
         settings.adminAuth = {
           type: "credentials",
           users: [
@@ -243,25 +274,51 @@ describe("node-red-contrib-promptinput", function () {
       }
       const data = `module.exports = ${JSON.stringify(settings, null, 2)}`
       fs.writeFileSync(settingsFile, data)
-      let cmdEnv = Object.assign(clone(process.env), env || {})
-      execObj = spawn(nodeRedBin, [`--userDir=${testDir}`], { env: cmdEnv })
-      stdout = ""
-      execObj.stdout.on("data", function (data) {
-        stdout += data.toString()
-        debug && console.log(data.toString().trimEnd())
-        if (stdout.includes("Started flows")) {
+      let cmdEnv = Object.assign(clone(process.env), that.env || {})
+      that.execObj = spawn(
+        nodeRedBin,
+        [`--userDir=${that.testDir}`, `--port=${that.port}`],
+        { env: cmdEnv }
+      )
+      that.stdout = ""
+      that.execObj.stdout.on("data", function (data) {
+        that.stdout += data.toString()
+        that.debug && console.log(data.toString().trimEnd())
+        if (that.stdout.includes("Started flows")) {
           return resolve()
         }
       })
-      execObj.stderr.on("data", function (data) {
-        debug && console.log(data.toString().trim())
+      that.execObj.stderr.on("data", function (data) {
+        that.debug && console.log(data.toString().trim())
       })
     })
   }
+  stop() {
+    try {
+      this.execObj.kill()
+    } catch (_) {}
+    try {
+      fs.rmSync(this.testDir, { recursive: true })
+    } catch (_) {}
+  }
+}
+
+// Tests
+describe("node-red-contrib-promptinput", function () {
   async function runTest({ config, input, omitFile, env, readOnly, point = "node" }) {
     let title, browserStdout
+    const selSuffix = " > .red-ui-flow-node-button > .red-ui-flow-node-button-button"
+    const selectors = {
+      node: `#eccd274036e3c9f4${selSuffix}`,
+      injector: `#de23be199256aca4${selSuffix}`,
+    }
     try {
-      await startNodeRed(config, env, readOnly)
+      const port = await getPort()
+      if (isNaN(port)) {
+        return
+      }
+      this.test.nodeRedObj = new NodeRED(config, env, readOnly, port)
+      await this.test.nodeRedObj.start()
       const browser = await firefox.launch()
       const context = await browser.newContext({ userAgent: "__pdi-test__" })
       const page = await context.newPage()
@@ -274,24 +331,19 @@ describe("node-red-contrib-promptinput", function () {
           .join("\n")
         browserStdout += args.trim()
       })
-      await page.goto("http://127.0.0.1:1880")
+      await page.goto(`http://127.0.0.1:${port}`)
       if (readOnly) {
-        await page.waitForSelector("#node-dialog-login-username")
-        await page.type("#node-dialog-login-username", "admin")
-        await page.type("#node-dialog-login-password", "111111")
-        await page.click("#node-dialog-login-submit")
-        await page.waitForNavigation()
+        await page.getByLabel("Username:").fill("admin")
+        await page.getByLabel("Password:").fill("111111")
+        await page.getByRole("button", { name: "Login" }).click()
       }
-      await page.waitForSelector("#red-ui-sidebar-tabs")
-      await delay(5 * 1000)
+      //await page.waitForSelector("#red-ui-sidebar-tabs")
+      await Promise.all(
+        Object.values(selectors).map((item) => page.waitForSelector(item))
+      )
       let dialogPromise = handlePrompt(page, input)
       while (true) {
-        const id = point === "node" ? "eccd274036e3c9f4" : "de23be199256aca4"
-        await page
-          .locator(
-            `#${id} > .red-ui-flow-node-button > .red-ui-flow-node-button-button`
-          )
-          .click({ button: "left" })
+        await page.locator(selectors[point]).click({ button: "left" })
         title = await dialogPromise
         if (title) {
           break
@@ -305,52 +357,60 @@ describe("node-red-contrib-promptinput", function () {
     }
     let msg = ""
     if (!omitFile) {
-      msg = JSON.parse(fs.readFileSync(outputFile))
+      msg = JSON.parse(fs.readFileSync(this.test.nodeRedObj.outputFile))
     }
     return { title, msg, stdout: browserStdout }
   }
+  beforeEach(function () {
+    this.currentTest.nodeRedObj = null
+  })
   afterEach(function () {
     delete process.env["__PDI_TEST__"]
     delete process.env["__PDI_TEST_FAIL_MODE__"]
-    try {
-      execObj.kill()
-    } catch (_) {}
-    try {
-      fs.rmSync(testDir, { recursive: true })
-    } catch (_) {}
+    this.currentTest.nodeRedObj.stop()
   })
-  it("Nested property", async function () {
-    let env = {}
-    env["__PDI_TEST__"] = "1"
-    let config = { property: "payload.city.name" }
-    const msg = "Hello world"
-    const act = await runTest({ config, input: msg, omitFile: false, env })
-    act.should.eql({
-      stdout: "promptinput.notification.success",
-      title: "promptinput.label.default_prompt",
-      msg: {
-        type: "string",
-        value: msg,
-      },
+  for (const mode of ["configuration", "message override"]) {
+    it(`Nested property (${mode})`, async function () {
+      let env = {}
+      env["__PDI_TEST__"] = "1"
+      const config = {
+        [mode === "configuration" ? "property" : "propOverride"]: "payload.city.name",
+      }
+      const msg = "Hello world"
+      const act = await runTest.call(this, {
+        config,
+        input: msg,
+        omitFile: false,
+        env,
+        point: mode === "configuration" ? "node" : "injector",
+      })
+      act.should.eql({
+        stdout: "promptinput.notification.success",
+        title: "promptinput.label.default_prompt",
+        msg: {
+          type: "string",
+          value: msg,
+        },
+      })
     })
-  })
+  }
   describe("Dialog title", function () {
     const tests = [
       { desc: "Custom", prompt: "My window" },
       { desc: "Default", ref: "promptinput.label.default_prompt" },
-      { desc: "Message", promptOveride: "Message prompt", point: "injector" },
+      { desc: "Message", promptOverride: "Message prompt", point: "injector" },
     ]
     tests.forEach(function (testObj) {
       it(testObj.desc, async function () {
-        const { ref, prompt = "", promptOveride = "", point = {} } = testObj
-        let act = await runTest({
-          config: { prompt, promptOveride },
+        const { ref, prompt = "", promptOverride = "", point } = testObj
+        let act = await runTest.call(this, {
+          config: { prompt, promptOverride },
           input: "John",
           point,
         })
         act.should.eql({
           stdout: "promptinput.notification.success",
-          title: ref || prompt || promptOveride,
+          title: ref || prompt || promptOverride,
           msg: { type: "string", value: "John" },
         })
       })
@@ -393,7 +453,7 @@ describe("node-red-contrib-promptinput", function () {
               Object.assign(config, { typeOverride: testObj.dataType })
               point = "injector"
             }
-            const act = await runTest({ config, input, point })
+            const act = await runTest.call(this, { config, input, point })
             act.should.eql({
               stdout: "promptinput.notification.success",
               title: "promptinput.label.default_prompt",
@@ -417,7 +477,12 @@ describe("node-red-contrib-promptinput", function () {
         let env = {}
         env["__PDI_TEST__"] = "1"
         env["__PDI_TEST_FAIL_MODE__"] = test.mode
-        let act = await runTest({ config: {}, input: "John", omitFile: true, env })
+        let act = await runTest.call(this, {
+          config: {},
+          input: "John",
+          omitFile: true,
+          env,
+        })
         act.should.eql({
           stdout: `promptinput.notification.failure (${test.code})`,
           title: "promptinput.label.default_prompt",
@@ -427,7 +492,7 @@ describe("node-red-contrib-promptinput", function () {
     })
     it("Authorization", async function () {
       const env = { __PDI_TEST__: "1" }
-      const act = await runTest({
+      const act = await runTest.call(this, {
         config: {},
         input: "John",
         omitFile: true,
@@ -444,26 +509,26 @@ describe("node-red-contrib-promptinput", function () {
   describe("Validation", function () {
     const env = { __PDI_TEST__: "1" }
     it("Invalid JSONata expression in configuration", async function () {
-      await runTest({
+      await runTest.call(this, {
         config: { validation: "$upper( = n" },
         input: "YES",
         omitFile: true,
         env,
       })
-      let act = getError(stdout)
+      let act = getError(this.test.nodeRedObj.stdout)
       act.should.eql("promptinput.errors.validation")
-      act = getWarning(stdout)
+      act = getWarning(this.test.nodeRedObj.stdout)
       act.should.eql("promptinput.errors.validation_disabled")
     })
     it("Invalid JSONata expression in message override", async function () {
-      await runTest({
+      await runTest.call(this, {
         config: { validationOverride: "$upper( = n" },
         input: "YES",
         omitFile: true,
         env,
-        point: "injector"
+        point: "injector",
       })
-      const act = getError(stdout)
+      const act = getError(this.test.nodeRedObj.stdout)
       act.should.eql("promptinput.errors.validation")
     })
     for (const mode of ["configuration", "message override"]) {
@@ -475,7 +540,7 @@ describe("node-red-contrib-promptinput", function () {
               ? { validation }
               : { validationOverride: validation }
           Object.assign(config, { property: "answer" })
-          const act = await runTest({
+          const act = await runTest.call(this, {
             config,
             input: result === "success" ? "YeS" : "No",
             omitFile: result !== "success",
@@ -485,7 +550,7 @@ describe("node-red-contrib-promptinput", function () {
           if (result === "success") {
             act.msg.should.eql({ type: "string", value: "YeS" })
           } else {
-            const act = getWarning(stdout)
+            const act = getWarning(this.test.nodeRedObj.stdout)
             act.should.eql("promptinput.validation.false")
           }
         })
@@ -495,44 +560,51 @@ describe("node-red-contrib-promptinput", function () {
   describe("Runtime errors and warnings", function () {
     it("Unsupported data type in message override", async function () {
       let env = { __PDI_TEST__: "1" }
-      await runTest({
+      await runTest.call(this, {
         config: { typeOverride: "abc" },
         input: "John",
         omitFile: true,
         env,
         point: "injector",
       })
-      const act = getWarning(stdout)
+      const act = getWarning(this.test.nodeRedObj.stdout)
       act.should.equal("promptinput.errors.type_ignored")
     })
     it("Wrong Boolean data type", async function () {
       let env = { __PDI_TEST__: "1" }
-      await runTest({ config: {}, input: "bool:John", omitFile: true, env })
-      const act = getError(stdout)
+      await runTest.call(this, { config: {}, input: "bool:John", omitFile: true, env })
+      const act = getError(this.test.nodeRedObj.stdout)
       act.should.equal("promptinput.errors.boolean")
     })
     it("Cannot convert to number", async function () {
       let env = { __PDI_TEST__: "1" }
-      await runTest({ config: {}, input: "num:A", omitFile: true, env })
-      const act = getError(stdout)
+      await runTest.call(this, { config: {}, input: "num:A", omitFile: true, env })
+      const act = getError(this.test.nodeRedObj.stdout)
       act.should.equal("promptinput.errors.number")
     })
     it("General conversion error", async function () {
       let env = { __PDI_TEST__: "1" }
-      await runTest({ config: {}, input: "obj:A", omitFile: true, env })
-      const act = getError(stdout)
+      await runTest.call(this, { config: {}, input: "obj:A", omitFile: true, env })
+      const act = getError(this.test.nodeRedObj.stdout)
       act.should.equal("promptinput.errors.conversion")
     })
-    it("Illegal property", async function () {
-      let env = { __PDI_TEST__: "1" }
-      await runTest({
-        config: { property: "payload.city.....name" },
-        input: "Hello",
-        omitFile: true,
-        env,
+    for (const mode of ["configuration", "message override"]) {
+      it(`Illegal property (${mode})`, async function () {
+        let env = { __PDI_TEST__: "1" }
+        const config = {
+          [mode === "configuration" ? "property" : "propOverride"]:
+            "payload.city.....name",
+        }
+        await runTest.call(this, {
+          config,
+          input: "Hello",
+          omitFile: true,
+          env,
+          point: mode === "configuration" ? "node" : "injector",
+        })
+        const act = getError(this.test.nodeRedObj.stdout)
+        act.should.equal("promptinput.errors.property")
       })
-      const act = getError(stdout)
-      act.should.equal("promptinput.errors.property")
-    })
+    }
   })
 })

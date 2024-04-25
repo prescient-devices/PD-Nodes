@@ -96,7 +96,10 @@ module.exports = function (RED) {
       }
       node.status({})
       let payload = inMsg.payload
-      let prop = config.property
+      let prop =
+        receivedMsg && hasValidStringProp(receivedMsg, "prop")
+          ? receivedMsg.prop.trim()
+          : config.property
       let type = config.datatype
       const validTypes = ["str", "num", "obj", "bool", "buf"]
       if (receivedMsg && hasValidStringProp(receivedMsg, "type")) {
@@ -118,7 +121,7 @@ module.exports = function (RED) {
       if (props.some((item) => !item)) {
         return node.error(errorMsg("promptinput.errors.property"))
       }
-      let obj = {}
+      let obj = receivedMsg || {}
       let outMsg = obj
       for (let prop of props.slice(0, -1)) {
         outMsg[prop] = {}
@@ -166,7 +169,7 @@ module.exports = function (RED) {
         return signalError(node, "promptinput.errors.conversion")
       }
       if (pass) {
-        node.send(Object.assign(receivedMsg || {}, obj))
+        node.send(obj)
       } else {
         node.warn(errorMsg("promptinput.validation.false"))
       }
