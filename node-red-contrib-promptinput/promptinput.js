@@ -79,10 +79,11 @@ module.exports = function (RED) {
       if (msgSrc !== "editor") {
         receivedMsg = inMsg
         RED.events.emit("runtime-event", {
-          id: `PROMPT-INPUT-${node.id}`,
+          id: `PROMPT-INPUT-${node._alias || node.id}`,
           retain: false,
           payload: {
             prompt: typeof prompt === "string" && prompt.trim() ? prompt.trim() : null,
+            realId: node.id,
           },
         })
         return

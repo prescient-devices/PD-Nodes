@@ -43,7 +43,7 @@
       return !props.some((item) => !item)
     }
     async function processClick(event, overrides) {
-      const { id, prompt: runtimePrompt } = overrides || {}
+      const { id, prompt: runtimePrompt, realId } = overrides || {}
       const node = id ? RED.nodes.node(id) : this
       const notifyMsg = (arg, opts) => globalIsInTest ? arg : node._(arg, opts)
       const nodeId = id || node.id
@@ -58,7 +58,7 @@
       }
       $.ajax({
         type: "POST",
-        url: `node-red-contrib-promptinput/prompt/${nodeId}`,
+        url: `node-red-contrib-promptinput/prompt/${realId || nodeId}`,
         headers: {
           Accept: "application/json",
           "Content-type": "application/json",
@@ -86,8 +86,8 @@
       const sentinel = "notification/PROMPT-INPUT-"
       if (topic.startsWith(sentinel)) {
         const id = topic.slice(sentinel.length).trim()
-        const { prompt } = payload
-        await processClick(null, { id, prompt })
+        const { prompt, realId } = payload
+        await processClick(null, { id, prompt, realId })
       }
     })
     const ejsonata = {
