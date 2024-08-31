@@ -40,7 +40,7 @@
       defaults: {
         name: { value: "" },
         datatype: { value: "str" },
-        stream: { value: false },
+        stream: { value: "no" },
         property: { value: "payload", required: true },
         propertyType: { value: "msg" },
       },
@@ -98,6 +98,9 @@
               {
                 method: "POST",
                 body: fileBlob,
+                headers: {
+                  "Content-Type": "application/octet-stream"
+                }
               }
             )
             try {
