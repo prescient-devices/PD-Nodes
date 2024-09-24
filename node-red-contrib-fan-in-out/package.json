@@ -1,0 +1,48 @@
+{
+	"name": "@prescient-devices/node-red-contrib-fan-in-out",
+	"version": "1.0.0",
+	"description": "Helps to fan in and label multiple inputs to a subflow and then fan out those inputs inside the subflow.",
+	"scripts": {
+		"test": "mocha --parallel --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
+	},
+	"author": "Pablo Acosta-Serafini <pablo.acosta@prescientdevices.com>",
+	"license": "MIT",
+	"node-red": {
+		"version": ">=2.1.3",
+		"nodes": {
+			"fanin": "faninout.js",
+			"fanout": "faninout.js"
+		}
+	},
+	"keywords": [
+		"node-red",
+		"subflow",
+		"multiple inputs"
+	],
+	"bugs": {
+		"url": "https://github.com/prescient-devices/PD-Nodes/issues"
+	},
+	"engines": {
+		"node": ">=12.0.0"
+	},
+	"devDependencies": {
+		"chai": "^4.3.6",
+		"jshint": "^2.13.5",
+		"mocha": "^8.4.0",
+		"node-red": "^2.2.2",
+		"node-red-node-test-helper": "^0.3.4",
+		"prettier": "^2.7.1"
+	},
+	"files": [
+		"package.json",
+		"LICENSE",
+		"README.md",
+		"examples/Four_virtual_inputs.json",
+		"faninout.html",
+		"faninout.js",
+		"icons/fanin.svg",
+		"icons/fanout.svg",
+		"locales/en-US/faninout.json",
+		"locales/en-US/faninout.html"
+	]
+}

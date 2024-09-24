@@ -1,0 +1,15 @@
+{
+  "faninout": {
+    "errors": {
+      "illegal_input_number": "Illegal input number: __num__",
+      "input_number_greater_than_fanout": "Input number (__num__) greater than node number of inputs (__max__)",
+      "illegal_number_of_inputs": "Illegal number of inputs: __num__",
+      "private_prop_override": "Private property msg._input is being overriden"
+    },
+    "label": {
+      "inputNum": "Input number",
+      "name": "Name",
+      "numInputs": "Number of inputs"
+    }
+  }
+}

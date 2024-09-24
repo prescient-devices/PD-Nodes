@@ -1,0 +1,73 @@
+<!--
+  faninout.html
+  Copyright 2024-Present Prescient Devices, Inc.
+-->
+<script type="text/x-red" data-template-name="fanin">
+  <div class="form-row node-input-name">
+     <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="faninout.label.name"></span></label>
+     <input type="text" id="node-input-name" data-i18n="[placeholder]faninout.label.name" style="width: 339.19px;">
+   </div>
+   <div class="form-row">
+     <label for="node-input-inputNum"><span data-i18n="faninout.label.inputNum"></span></label>
+     <input type="number" id="node-input-inputNum" min=1 value=1 style="width: 25%;">
+   </div>
+</script>
+
+<script type="text/x-red" data-template-name="fanout">
+  <div class="form-row node-input-name">
+     <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="faninout.label.name"></span></label>
+     <input type="text" id="node-input-name" data-i18n="[placeholder]faninout.label.name" style="width: 339.19px;">
+   </div>
+   <div class="form-row">
+     <label for="node-input-outputs"><span data-i18n="faninout.label.numInputs"></span></label>
+     <input type="number" id="node-input-outputs" min=1 value=1 style="width: 25%;">
+   </div>
+</script>
+
+<script type="text/javascript">
+  ;(function () {
+    function validateFactory(prop) {
+      function validatePosInt(arg) {
+        let num = this.hasOwnProperty(prop) ? this[prop] : arg
+        if ([null, undefined, ""].includes(num)) {
+          return true
+        }
+        num = parseInt(num)
+        return Number.isInteger(num) && num > 0
+      }
+      return validatePosInt
+    }
+    RED.nodes.registerType("fanin", {
+      category: "prescient",
+      color: "rgb(74, 179, 255)",
+      defaults: {
+        name: { value: "" },
+        inputNum: { value: 1, required: true, validate: validateFactory("inputNum") },
+      },
+      inputs: 1,
+      outputs: 1,
+      icon: "fanin.svg",
+      label: function () {
+        const num = parseInt(this.inputNum)
+        return this.name || (Number.isInteger(num) ? "I" + num : "fanin")
+      },
+    })
+    RED.nodes.registerType("fanout", {
+      category: "prescient",
+      color: "rgb(74, 179, 255)",
+      defaults: {
+        name: { value: "" },
+        outputs: { value: 1, required: true, validate: validateFactory("outputs") },
+      },
+      inputs: 1,
+      outputs: 1,
+      icon: "fanout.svg",
+      label: function () {
+        return this.name || "fanout"
+      },
+      outputLabels: function (index) {
+        return "I" + (index + 1)
+      },
+    })
+  })()
+</script>

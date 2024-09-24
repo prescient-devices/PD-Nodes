@@ -1,0 +1,324 @@
+[
+  {
+    "id": "6322d27f718f8344",
+    "type": "tab",
+    "label": "Fan in and out example",
+    "disabled": false,
+    "info": "",
+    "env": []
+  },
+  {
+    "id": "3dfcdd847e1e4283",
+    "type": "subflow",
+    "name": "Virtual 4 inputs",
+    "info": "",
+    "category": "",
+    "in": [
+      {
+        "x": 60,
+        "y": 120,
+        "wires": [
+          {
+            "id": "3cafc3ff05670a73"
+          }
+        ]
+      }
+    ],
+    "out": [
+      {
+        "x": 320,
+        "y": 60,
+        "wires": [
+          {
+            "id": "3cafc3ff05670a73",
+            "port": 0
+          }
+        ]
+      },
+      {
+        "x": 320,
+        "y": 100,
+        "wires": [
+          {
+            "id": "3cafc3ff05670a73",
+            "port": 1
+          }
+        ]
+      },
+      {
+        "x": 320,
+        "y": 140,
+        "wires": [
+          {
+            "id": "3cafc3ff05670a73",
+            "port": 2
+          }
+        ]
+      },
+      {
+        "x": 320,
+        "y": 180,
+        "wires": [
+          {
+            "id": "3cafc3ff05670a73",
+            "port": 3
+          }
+        ]
+      }
+    ],
+    "env": [
+      {
+        "name": "deviceID",
+        "type": "dev",
+        "value": "",
+        "ui": {
+          "icon": "font-awesome/fa-server",
+          "type": "input",
+          "opts": {
+            "types": ["dev", "file", "env"]
+          }
+        }
+      }
+    ],
+    "meta": {},
+    "color": "#DDAA99"
+  },
+  {
+    "id": "3cafc3ff05670a73",
+    "type": "fanout",
+    "z": "3dfcdd847e1e4283",
+    "name": "1:4",
+    "outputs": 4,
+    "x": 170,
+    "y": 120,
+    "wires": [[], [], [], []]
+  },
+  {
+    "id": "68379be3612694e2",
+    "type": "debug",
+    "z": "6322d27f718f8344",
+    "name": "Input 1 output",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 720,
+    "y": 400,
+    "wires": []
+  },
+  {
+    "id": "4d9ae1dd1052bf59",
+    "type": "fanin",
+    "z": "6322d27f718f8344",
+    "name": "",
+    "inputNum": "1",
+    "x": 330,
+    "y": 360,
+    "wires": [["f39a9fc8a7764dea"]]
+  },
+  {
+    "id": "5045cb5b957a040f",
+    "type": "inject",
+    "z": "6322d27f718f8344",
+    "name": "Source 1",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "This comes from input 1",
+    "payloadType": "str",
+    "trigger": true,
+    "x": 180,
+    "y": 360,
+    "wires": [["4d9ae1dd1052bf59"]]
+  },
+  {
+    "id": "d35d67e5b548496d",
+    "type": "fanin",
+    "z": "6322d27f718f8344",
+    "name": "",
+    "inputNum": "2",
+    "x": 330,
+    "y": 400,
+    "wires": [["f39a9fc8a7764dea"]]
+  },
+  {
+    "id": "0a9ae935d5bedbd7",
+    "type": "fanin",
+    "z": "6322d27f718f8344",
+    "name": "",
+    "inputNum": "4",
+    "x": 330,
+    "y": 440,
+    "wires": [["f39a9fc8a7764dea"]]
+  },
+  {
+    "id": "541d12198dc03300",
+    "type": "inject",
+    "z": "6322d27f718f8344",
+    "name": "Source 2",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "This comes from input 2",
+    "payloadType": "str",
+    "trigger": true,
+    "x": 180,
+    "y": 400,
+    "wires": [["d35d67e5b548496d"]]
+  },
+  {
+    "id": "e6086e3d20597573",
+    "type": "inject",
+    "z": "6322d27f718f8344",
+    "name": "Source 4",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "This comes from input 4",
+    "payloadType": "str",
+    "trigger": true,
+    "x": 180,
+    "y": 440,
+    "wires": [["0a9ae935d5bedbd7"]]
+  },
+  {
+    "id": "822b6b9ad31fef29",
+    "type": "debug",
+    "z": "6322d27f718f8344",
+    "name": "Input 2 output",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 720,
+    "y": 440,
+    "wires": []
+  },
+  {
+    "id": "8997aa2777e0267e",
+    "type": "debug",
+    "z": "6322d27f718f8344",
+    "name": "Input 4 output",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 720,
+    "y": 480,
+    "wires": []
+  },
+  {
+    "id": "f3dd3725b5e6f006",
+    "type": "inject",
+    "z": "6322d27f718f8344",
+    "name": "Broadcast",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "This goes to all outputs",
+    "payloadType": "str",
+    "trigger": true,
+    "x": 320,
+    "y": 480,
+    "wires": [["f39a9fc8a7764dea"]]
+  },
+  {
+    "id": "f39a9fc8a7764dea",
+    "type": "subflow:3dfcdd847e1e4283",
+    "z": "6322d27f718f8344",
+    "name": "",
+    "env": [],
+    "x": 540,
+    "y": 440,
+    "wires": [["68379be3612694e2"], ["822b6b9ad31fef29"], [], ["8997aa2777e0267e"]]
+  },
+  {
+    "id": "c2e84ca9b2976c1e",
+    "type": "group",
+    "z": "6322d27f718f8344",
+    "name": "This will generate a warning",
+    "style": {
+      "label": true
+    },
+    "nodes": ["a8576a2730171262", "b7a64e9d89441e7d"],
+    "env": [],
+    "x": 74,
+    "y": 539,
+    "w": 332,
+    "h": 82
+  },
+  {
+    "id": "a8576a2730171262",
+    "type": "fanin",
+    "z": "6322d27f718f8344",
+    "g": "c2e84ca9b2976c1e",
+    "name": "",
+    "inputNum": "5",
+    "x": 330,
+    "y": 580,
+    "wires": [["f39a9fc8a7764dea"]]
+  },
+  {
+    "id": "b7a64e9d89441e7d",
+    "type": "inject",
+    "z": "6322d27f718f8344",
+    "g": "c2e84ca9b2976c1e",
+    "name": "Source 5",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "This comes from input 5",
+    "payloadType": "str",
+    "trigger": true,
+    "x": 180,
+    "y": 580,
+    "wires": [["a8576a2730171262"]]
+  }
+]

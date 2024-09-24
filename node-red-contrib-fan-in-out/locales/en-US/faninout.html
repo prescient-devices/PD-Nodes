@@ -1,0 +1,20 @@
+<!--
+  Copyright 2022-Present Prescient Devices, Inc.
+-->
+<script type="text/html" data-help-name="fanin">
+  <p>Labels message with an input number in the <code>msg._input</code>
+  property.</p>
+
+  <p> Pairs with <code>fanout</code> node to make it easier to have a subflow
+  with multiple (virtual) inputs.</p>
+</script>
+
+<script type="text/html" data-help-name="fanout">
+  <p>Routes messages to one or all of the node's outputs. The output number is
+  taken from <code>msg._input</code> (starting at 1); if <code>msg._input</code>
+  does not exist the input message is routed to all outputs.</p>
+
+ <p>Pairs with <code>fanin</code> node to make it easier to have a subflow with
+ multiple (virtual) inputs.</p>
+</script>
+
