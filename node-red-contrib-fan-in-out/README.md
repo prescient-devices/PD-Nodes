@@ -1,5 +1,9 @@
-node-red-contrib-faninout
-=========================
+@prescient-devices/node-red-contrib-fan-in-out
+============================================
+
+> [!CAUTION]
+> This package has been deprecated, for new installations please use
+> [@prescient-devices-oss/node-red-contrib-fan-in-out](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-fan-in-out)
 
 A pair of nodes that makes it easier and faster to have a subflow with multiple
 (virtual inputs).
