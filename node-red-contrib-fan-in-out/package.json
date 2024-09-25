@@ -1,6 +1,6 @@
 {
 	"name": "@prescient-devices/node-red-contrib-fan-in-out",
-	"version": "1.0.1",
+	"version": "1.0.3",
 	"description": "Helps to fan in and label multiple inputs to a subflow and then fan out those inputs inside the subflow.",
 	"scripts": {
 		"test": "mocha --parallel --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
@@ -10,8 +10,7 @@
 	"node-red": {
 		"version": ">=2.1.3",
 		"nodes": {
-			"fanin": "faninout.js",
-			"fanout": "faninout.js"
+			"fanin": "faninout.js"
 		}
 	},
 	"keywords": [
