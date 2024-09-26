@@ -1,0 +1,10 @@
+{
+  "te": {
+    "label": {
+      "apiKey": "API key",
+      "hostname": "Hostname",
+      "name": "Name",
+      "secrets": "Credentials"
+    }
+  }
+}

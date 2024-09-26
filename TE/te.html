@@ -1,0 +1,54 @@
+<script type="text/html" data-template-name="te-config">
+  <div class="form-row">
+    <label for="node-config-input-name"><i class="fa fa-tag"></i> <span data-i18n="te.label.name"></span></label>
+    <input type="text" id="node-config-input-name" data-i18n="[placeholder]te.label.name">
+  </div>
+  <div class="form-row">
+    <label for="node-config-input-hostname"><i class="fa fa-globe" style="width: 20px;"></i><span data-i18n="te.label.hostname"></span></label>
+    <input type="text" id="node-config-input-hostname" data-i18n="[placeholder]te.label.hostname" style="width: 339.19px;">
+  </div>
+   <div class="form-row">
+    <label for="node-config-input-apiKey"><i class="fa fa-key" style="width: 20px;"></i></i><span data-i18n="te.label.apiKey"></span></label>
+    <input type="password" id="node-config-input-apiKey">
+  </div>
+</script>
+<script type="text/x-red" data-template-name="te-connector">
+  <div class="form-row">
+    <label for="node-input-secrets"><i class="fa fa-id-card-o" style="width: 20px;"></i> <span data-i18n="te.label.credentials"></span></label>
+    <input type="text" id="node-input-secrets">
+  </div>
+  <div class="form-row">
+    <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="te.label.name"></span></label>
+    <input type="text" id="node-input-name" data-i18n="[placeholder]te.label.name" style="width: 339.19px;">
+  </div>
+</script>
+<script type="text/javascript">
+  ; (function () {
+    RED.nodes.registerType("te-config", {
+      category: "config",
+      defaults: { name: { value: "" }, },
+      credentials: {
+        hostname: { type: "text" }, apiKey: { type: "password" },
+      },
+      label: function () {
+        if (this.name) {
+          return this.name
+        }
+        return `API key @ ${this.hostname || "no host specified"}`
+      },
+    })
+    RED.nodes.registerType("te-connector", {
+      category: "TechExchange",
+      color: "#AAAA66",
+      defaults: {
+        secrets: { type: "te-config", required: true }, name: { value: "" },
+      },
+      inputs: 1,
+      outputs: 1,
+      icon: "font-awesome/fa-chevron-right",
+      label: function () {
+        return this.name || "connector"
+      }
+    })
+  })()
+</script>

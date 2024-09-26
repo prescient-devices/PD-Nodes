@@ -1,0 +1,24 @@
+<script type="text/x-red" data-template-name="te-sniffer">
+  <div class="form-row node-input-name">
+    <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="te-sniffer.label.name"></span></label>
+    <input type="text" id="node-input-name" data-i18n="[placeholder]te.label.name" style="width: 339.19px;">
+  </div>
+</script>
+<script type="text/javascript">
+  ; (function () {
+    RED.nodes.registerType("te-sniffer", {
+      category: "TechExchange",
+      color: "#FFAAAA",
+      defaults: {
+        name: { value: "" },
+      },
+      inputs: 1,
+      outputs: 1,
+      icon: "font-awesome/fa-user-secret",
+      label: function () {
+        return this.name || "sniffer"
+      }
+    })
+
+  })()
+</script>
