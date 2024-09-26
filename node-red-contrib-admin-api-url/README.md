@@ -1,10 +1,14 @@
 @prescient-devices/node-red-contrib-admin-api-url
 =================================================
 
+> [!CAUTION]
+> This package has been deprecated, for new installations please use
+> [@prescient-devices-oss/node-red-contrib-admin-api-url](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-admin-api-url)
+
 This module adds a `url` method the the message with the local HTTP
 administrator API URL
 
-Copyright 2020 Prescient Devices, Inc.
+Copyright 2020-present Prescient Devices, Inc.
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above

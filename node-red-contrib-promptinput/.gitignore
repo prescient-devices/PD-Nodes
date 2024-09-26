@@ -3,3 +3,7 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/test/Firefox_*
+/test/WebKit_*
+/test/Chromium_*
+/test/node-red-distro-*

@@ -1,11 +1,14 @@
 @prescient-devices/node-red-node-mqtt-out-json
 ==============================================
 
+> [!CAUTION]
+> This package has been deprecated and is no longer maintained
+
 MQTT output node that optionally ignores empty topics. Paired with
 [@prescient-devices/node-red-node-mqtt-in-json](https://flows.nodered.org/node/@prescient-devices/node-red-node-mqtt-in-json)
 it is able to transmit a whole message, not just the payload.
 
-Copyright 2020 Prescient Devices, Inc.
+Copyright 2020-present Prescient Devices, Inc.
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above

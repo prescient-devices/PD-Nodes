@@ -1,6 +1,10 @@
 node-red-contrib-fileinput
 ==========================
 
+> [!CAUTION]
+> This package has been deprecated, for new installations please use
+> [@prescient-devices-oss/node-red-contrib-fileinput](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-fileinput)
+
 A node that once its buttons is pressed, prompts user to select a file from the
 browser's file system and then emits its contents as a message or a series of
 messages if the streaming option is selected.

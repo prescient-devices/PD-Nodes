@@ -1,6 +1,10 @@
 node-red-contrib-promptinput
 ============================
 
+> [!CAUTION]
+> This package has been deprecated, for new installations please use
+> [@prescient-devices-oss/node-red-contrib-promptinput](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-promptinput)
+
 A node that once its button is pressed or it receives a message, prompts the
 user for input and emits a message with that input converted to a desired data
 type. An optional JSONata expression can be used to validate the input and emit

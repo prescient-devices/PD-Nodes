@@ -1,9 +1,13 @@
 @prescient-devices/node-red-contrib-home-dir
 ============================================
 
+> [!CAUTION]
+> This package has been deprecated, for new installations please use
+> [@prescient-devices-oss/node-red-contrib-home-dir](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-home-dir)
+
 This module returns the Node-RED home directory
 
-Copyright 2020 Prescient Devices, Inc.
+Copyright 2020-present Prescient Devices, Inc.
 
 Permission to use, copy, modify, and/or distribute this software for any
 purpose with or without fee is hereby granted, provided that the above

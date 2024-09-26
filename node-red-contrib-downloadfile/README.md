@@ -1,6 +1,10 @@
 node-red-contrib-downloadfile
 =============================
 
+> [!CAUTION]
+> This package has been deprecated, for new installations please use
+> [@prescient-devices-oss/node-red-contrib-downloadfile](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-downloadfile)
+
 A node to download a message's payload to the browser's local file system
 
 ### Installation
