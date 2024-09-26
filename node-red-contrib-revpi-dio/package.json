@@ -1,5 +1,5 @@
 {
-  "name": "@prescient-devices/node-red-contrib-revpi-dio",
+  "name": "@prescient-devices-oss/node-red-contrib-revpi-dio",
   "version": "2.0.2",
   "description": "Node-Red-Node to read write revpi DIO using revpimoio2",
   "main": "index.js",

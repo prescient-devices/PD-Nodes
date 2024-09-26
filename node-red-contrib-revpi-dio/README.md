@@ -1,7 +1,4 @@
 # RevPI DIO Node-Red Node
-> [!CAUTION]
-> This package has been deprecated, for new installations please use
-> [@prescient-devices-oss/node-red-contrib-revpi-dio](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-revpi-dio)
 
 RevPiDIO is a node-red node for reading/writing RevPiDIO Input Ouputs.
 

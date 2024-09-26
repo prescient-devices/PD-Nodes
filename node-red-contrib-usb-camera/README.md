@@ -1,9 +1,5 @@
-@prescient-devices/node-red-contrib-usb-camera
+@prescient-devices-oss/node-red-contrib-usb-camera
 ==============================================
-
-> [!CAUTION]
-> This package has been deprecated, for new installations please use
-> [@prescient-devices-oss/node-red-contrib-usb-camera](https://flows.nodered.org/node/@prescient-devices/node-red-contrib-usb-camera)
 
 This module is a front-end to the [fswebcam](https://github.com/fsphil/fswebcam) utility to enable image capturing from within Node-RED. This node is disabled if fswebcam is not detected.
 

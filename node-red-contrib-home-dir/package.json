@@ -1,5 +1,5 @@
 {
-  "name": "@prescient-devices/node-red-contrib-home-dir",
+  "name": "@prescient-devices-oss/node-red-contrib-home-dir",
   "version": "1.0.2",
   "description": "Returns Node-RED home directory",
   "main": "index.js",

@@ -1,5 +1,5 @@
 {
-	"name": "@prescient-devices/node-red-contrib-promptinput",
+	"name": "@prescient-devices-oss/node-red-contrib-promptinput",
 	"version": "1.2.4",
 	"description": "Emits an output message based on user input entered via browser's prompt.",
 	"scripts": {

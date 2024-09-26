@@ -1,5 +1,5 @@
 {
-  "name": "@prescient-devices/node-red-contrib-usb-camera",
+  "name": "@prescient-devices-oss/node-red-contrib-usb-camera",
   "version": "1.1.6",
   "description": "Front-end to the fswebcam utility to enable image capturing from within Node-RED",
   "main": "index.js",

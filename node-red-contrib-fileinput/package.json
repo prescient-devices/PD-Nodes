@@ -1,5 +1,5 @@
 {
-  "name": "@prescient-devices/node-red-contrib-fileinput",
+  "name": "@prescient-devices-oss/node-red-contrib-fileinput",
   "version": "1.0.4",
   "description": "Asks user to select a file from the browser's file sytem and then emits its contents as a message or messages if the streaming option is selected",
   "scripts": {
