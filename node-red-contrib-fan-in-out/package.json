@@ -1,5 +1,5 @@
 {
-	"name": "@prescient-devices/node-red-contrib-fan-in-out",
+	"name": "@prescient-devices-oss/node-red-contrib-fan-in-out",
 	"version": "1.0.4",
 	"description": "Helps to fan in and label multiple inputs to a subflow and then fan out those inputs inside the subflow.",
 	"scripts": {
