@@ -8,13 +8,54 @@
 /* jshint -W121 */
 /* jshint forin: false */
 
-const fs = require("fs")
+// NodeJS imports
+const EventEmitter = require("events")
+// npm imports
 const jsonata = require("jsonata")
 
 const globalIsInTest =
   ["true", "1"].includes((process.env["__PDI_TEST__"] || "").toLowerCase()) ||
   typeof global.it === "function"
 const globalFailMode = globalIsInTest && process.env["__PDI_TEST_FAIL_MODE__"]
+
+function dependencyError(RED, node) {
+    const errorKey = "promptinput.errors.dependency"
+    const text = globalIsInTest ? errorKey : RED._(errorKey)
+    node.status({ text, fill: "red", shape: "dot" })
+    node.error(text)
+}
+
+class ImportModule extends EventEmitter {
+  constructor(RED, node) {
+    super()
+    this.RED = RED
+    this.node = node
+    this.getProperty = null
+    this.setProperty = null
+  }
+  async load() {
+    this.inProgress = true
+    try {
+      if (globalFailMode === "dependency") {
+        throw new Error("Dependency load error")
+      }
+      const { getProperty, setProperty } = await import("dot-prop")
+      this.getProperty = getProperty
+      this.setProperty = setProperty
+      this.emit("done", false)
+      return
+    } catch (_) {}
+    this.emit("done", true)
+    dependencyError(this.RED, this.node)
+  }
+  getProperty(obj, prop) {
+    return this.getProperty(obj, prop)
+  }
+  setProperty(obj, prop, value) {
+    this.setProperty(obj, prop, value)
+  }
+}
+
 module.exports = function (RED) {
   function errorMsg(arg1, arg2) {
     return globalIsInTest ? arg1 : RED._(arg1, arg2)
@@ -64,7 +105,17 @@ module.exports = function (RED) {
         node.expression = null
       }
     }
+    const modObj = new ImportModule(RED, node)
+    const promise = new Promise(function (resolve) {
+      modObj.once("done", (result) => resolve(result))
+    })
+    modObj.load()
     node.on("input", async function (inMsg) {
+      const error = await promise
+      if (error) {
+        dependencyError(RED, node)
+        return
+      }
       if (hasValidStringProp(inMsg, "validation")) {
         let tmp
         try {
@@ -127,22 +178,17 @@ module.exports = function (RED) {
       if (props.some((item) => !item)) {
         return node.error(errorMsg("promptinput.errors.property"))
       }
-      let obj = receivedMsg || {}
-      let outMsg = obj
-      for (let prop of props.slice(0, -1)) {
-        outMsg[prop] = {}
-        outMsg = outMsg[prop]
-      }
-      prop = props.slice(-1)[0]
+      const outMsg = receivedMsg || {}
       let pass = true
+      let value
       try {
         if (type === "obj") {
-          outMsg[prop] = JSON.parse(userInput)
+          value = JSON.parse(userInput)
         } else if (type === "buf") {
-          outMsg[prop] = Buffer.from(userInput)
+          value = Buffer.from(userInput)
         } else if (type === "num") {
-          outMsg[prop] = Number(userInput)
-          if (isNaN(outMsg[prop])) {
+          value = Number(userInput)
+          if (isNaN(value)) {
             return node.error(errorMsg("promptinput.errors.number"))
           }
         } else if (type === "bool") {
@@ -150,14 +196,16 @@ module.exports = function (RED) {
           if (!["true", "false", "0", "1"].includes(tmp)) {
             return node.error(errorMsg("promptinput.errors.boolean"))
           }
-          outMsg[prop] = Boolean(["1", "true"].includes(tmp))
+          value = Boolean(["1", "true"].includes(tmp))
         } else {
-          outMsg[prop] = userInput.toString()
+          value = userInput.toString()
         }
+        modObj.setProperty(outMsg, prop, value)
         if (expression) {
           pass = false
           try {
-            const tmp = await expression.evaluate({ [prop]: outMsg[prop] })
+            const obj = modObj.setProperty({}, prop, value)
+            const tmp = await expression.evaluate(obj)
             pass = Boolean(tmp)
           } catch (error) {
             return signalError(node, "promptinput.errors.validation_evaluation")
@@ -175,7 +223,7 @@ module.exports = function (RED) {
         return signalError(node, "promptinput.errors.conversion")
       }
       if (pass) {
-        node.send(obj)
+        node.send(outMsg)
       } else {
         node.warn(errorMsg("promptinput.validation.false"))
       }

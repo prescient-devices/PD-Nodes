@@ -32,10 +32,21 @@ the node's `package.json` is):
     $ npm install
     [...]
 
-Then to run the tests:
+The tests are run using some or all of these browsers: Chromium and Mozilla
+Firefox. To set up the tests:
 
     $ cd "${HOME}"/node-red-contrib-promptinput
-    $ npm test
+    $ npm run make-test-suite
+    Test directory: [...]
+    [...]
+
+Then issue the command `npm run test-firefox` or `npm run test-chromium` to run
+the tests with Mozilla Firefox or Chromium, respectively. For example, to run
+tests with Mozilla Firefox:
+
+    $ npm run test-firefox
+    > @prescient-devices-oss/node-red-contrib-promptinput@1.2.5 test-firefox
+    > mocha --bail --full-warning --full-trace --timeout $((60*1000)) "test/Firefox_*_spec.js"
     [...]
 
 ### Contributing / Fixes

@@ -578,6 +578,18 @@ describe("node-red-contrib-promptinput", function () {
         }
       })
       describe("Runtime errors and warnings", function () {
+        it("Cannot load dependency", async function () {
+          let env = { __PDI_TEST__: "1", __PDI_TEST_FAIL_MODE__: "dependency" }
+          await runTest.call(this, {
+            browserCls,
+            config: {},
+            input: "John",
+            omitFile: true,
+            env,
+          })
+          const act = getError(this.test.nodeRedObj.stdout)
+          act.should.equal("promptinput.errors.dependency")
+        })
         it("Unsupported data type in message override", async function () {
           let env = { __PDI_TEST__: "1" }
           await runTest.call(this, {

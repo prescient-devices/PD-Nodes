@@ -3,6 +3,7 @@
     "errors": {
       "boolean": "Input value is not recognized as Boolean",
       "conversion": "Cannot convert user input to selected data type",
+      "dependency": "Dependency could not be loaded",
       "failed": "Failed to create message with user input\n__error__",
       "number": "Cannot convert user input to number",
       "property": "Illegal property specification",

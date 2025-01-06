@@ -1,9 +1,11 @@
 {
 	"name": "@prescient-devices-oss/node-red-contrib-promptinput",
-	"version": "1.2.4",
+	"version": "1.2.5",
 	"description": "Emits an output message based on user input entered via browser's prompt.",
 	"scripts": {
-		"test": "mocha --parallel --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
+		"make-test-suite": "bin/make-test-suite.sh",
+		"test-chromium": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/Chromium_*_spec.js\"",
+		"test-firefox": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/Firefox_*_spec.js\""
 	},
 	"author": "Pablo Acosta-Serafini <pablo.acosta@prescientdevices.com>",
 	"license": "MIT",
@@ -24,6 +26,7 @@
 		"node": ">=12.0.0"
 	},
 	"dependencies": {
+		"dot-prop": "^9.0.0",
 		"jsonata": "^2.0.4"
 	},
 	"devDependencies": {
