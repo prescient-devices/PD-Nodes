@@ -6,6 +6,17 @@
     Asks user to select a file from the browser's file sytem and then emits its contents
     as a message or messages if the streaming option is selected.
   </p>
+  <h3>Inputs</h3>
+  <dl class="message-properties">
+    <dt class="optional">[any properties]<span class="property-type">various</span></dt>
+    <dd>
+      A message on the input port acts like clicking the node's button: it opens the file
+      picker in the open editor. Every property carried by the input message is merged into
+      the emitted output message(s), in both streaming and non-streaming mode. The node's
+      own properties (such as <code>filename</code>, <code>end</code> and the streaming
+      metadata) take precedence when a name collides.
+    </dd>
+  </dl>
   <h3>Outputs</h3>
   <dl class="message-properties">
     <dt class="optional">[user-defined]<span class="property-type">various</span></dt>

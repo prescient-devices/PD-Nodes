@@ -34,6 +34,99 @@
     let globalId = null
     let globalFileInFlight = false
     const globalIsInTest = window.navigator.userAgent === "__pdi-test-puppeteer__"
+    // Shared by the toolbar button and by wire-triggered messages: prompt the
+    // user for a file and upload it to the given runtime node.
+    async function openFilePicker(node, realId) {
+      globalId = realId || node.id
+      const notifyMsg = (arg, dict) => globalIsInTest ? arg : node._(arg, dict)
+      async function readFile() {
+        let that = this
+        if (!that.files.length) {
+          return
+        }
+        let fileBlob = that.files[0]
+        if (!fileBlob) {
+          return
+        }
+        const filename = fileBlob.name
+        const size = fileBlob.size
+        const fileData = { filename, size }
+        try {
+          await new Promise(function (resolve, reject) {
+            $.ajax({
+              type: "POST",
+              url: `node-red-contrib-fileinput/file/${globalId}`,
+              headers: {
+                Accept: "application/json",
+                "Content-type": "application/json",
+              },
+              data: JSON.stringify(fileData),
+              datatype: "json",
+              success: function () {
+                return resolve()
+              },
+              error: function (jqXHR, textStatue, errorThrown) {
+                const code = jqXHR.status
+                const msg = notifyMsg(code === 401 ? "fileinput.notification.authorization" : "fileinput.notification.failure")
+                globalIsInTest && console.log(`fileinput: ${msg} (${jqXHR.status})`)
+                RED.notify(msg, "error")
+                return reject()
+              },
+            })
+          })
+        } catch (_) {
+          return
+        }
+        const request = new Request(
+          `node-red-contrib-fileinput/file/${globalId}`,
+          {
+            method: "POST",
+            body: fileBlob,
+            headers: {
+              "Content-Type": "application/octet-stream"
+            }
+          }
+        )
+        try {
+          let response = await fetch(request)
+          if (typeof response === "object" && response.ok) {
+            const msg = notifyMsg("fileinput.notification.success", { filename })
+            globalIsInTest && console.log(`fileinput: ${msg}`)
+            return RED.notify(msg, { type: "success", id: "fileinput", timeout: 2000 })
+          }
+        } catch (error) { }
+        const msg = notifyMsg("fileinput.notification.failure", { filename })
+        globalIsInTest && console.log(`fileinput: ${msg}`)
+        RED.notify(msg, "error")
+      }
+      if (globalFileInFlight) {
+        return
+      }
+      globalFileInFlight = true
+      let obj
+      try {
+        obj = document.createElement("input")
+        obj.setAttribute("type", "file")
+        obj.addEventListener("change", readFile)
+        obj.click()
+      } catch (_) { }
+      obj && obj.remove()
+      globalFileInFlight = false
+    }
+    // A message on the node's input port raises this runtime event, which
+    // arrives here as a comms notification and opens the file picker just as
+    // if the toolbar button had been clicked.
+    RED.comms.subscribe("notification/#", async function (topic, payload) {
+      const sentinel = "notification/FILE-INPUT-"
+      if (topic.startsWith(sentinel)) {
+        const id = topic.slice(sentinel.length).trim()
+        const { realId } = payload || {}
+        const node = RED.nodes.node(id)
+        if (node) {
+          await openFilePicker(node, realId)
+        }
+      }
+    })
     RED.nodes.registerType("fileinput", {
       category: "prescient",
       color: "rgb(74, 179, 255)",
@@ -44,7 +137,7 @@
         property: { value: "payload", required: true },
         propertyType: { value: "msg" },
       },
-      inputs: 0,
+      inputs: 1,
       outputs: 1,
       icon: "file-in.svg",
       label: function () {
@@ -52,82 +145,7 @@
       },
       button: {
         onclick: async function () {
-          globalId = this.id
-          let node = this
-          const notifyMsg = (arg, dict) => globalIsInTest ? arg : node._(arg, dict)
-          async function readFile() {
-            let that = this
-            if (!that.files.length) {
-              return
-            }
-            let fileBlob = that.files[0]
-            if (!fileBlob) {
-              return
-            }
-            const filename = fileBlob.name
-            const size = fileBlob.size
-            const fileData = { filename, size }
-            try {
-              await new Promise(function (resolve, reject) {
-                $.ajax({
-                  type: "POST",
-                  url: `node-red-contrib-fileinput/file/${globalId}`,
-                  headers: {
-                    Accept: "application/json",
-                    "Content-type": "application/json",
-                  },
-                  data: JSON.stringify(fileData),
-                  datatype: "json",
-                  success: function () {
-                    return resolve()
-                  },
-                  error: function (jqXHR, textStatue, errorThrown) {
-                    const code = jqXHR.status
-                    const msg = notifyMsg(code === 401 ? "fileinput.notification.authorization" : "fileinput.notification.failure")
-                    globalIsInTest && console.log(`fileinput: ${msg} (${jqXHR.status})`)
-                    RED.notify(msg, "error")
-                    return reject()
-                  },
-                })
-              })
-            } catch (_) {
-              return
-            }
-            const request = new Request(
-              `node-red-contrib-fileinput/file/${globalId}`,
-              {
-                method: "POST",
-                body: fileBlob,
-                headers: {
-                  "Content-Type": "application/octet-stream"
-                }
-              }
-            )
-            try {
-              let response = await fetch(request)
-              if (typeof response === "object" && response.ok) {
-                const msg = notifyMsg("fileinput.notification.success", { filename })
-                globalIsInTest && console.log(`fileinput: ${msg}`)
-                return RED.notify(msg, { type: "success", id: "fileinput", timeout: 2000 })
-              }
-            } catch (error) { }
-            const msg = notifyMsg("fileinput.notification.failure", { filename })
-            globalIsInTest && console.log(`fileinput: ${msg}`)
-            RED.notify(msg, "error")
-          }
-          if (globalFileInFlight) {
-            return
-          }
-          globalFileInFlight = true
-          let obj
-          try {
-            obj = document.createElement("input")
-            obj.setAttribute("type", "file")
-            obj.addEventListener("change", readFile)
-            obj.click()
-          } catch (_) { }
-          obj && obj.remove()
-          globalFileInFlight = false
+          await openFilePicker(this)
         },
       },
       oneditprepare: function () {

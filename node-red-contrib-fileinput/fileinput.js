@@ -43,7 +43,7 @@ module.exports = function (RED) {
       })
       if (!node || !config || globalFailMode === "NO-NODE") {
         globalHash[req.params.id] = null
-        node.receive({ status: "error", error: globalError })
+        node.receive({ __msgSrc: "editor", status: "error", error: globalError })
         return res.sendStatus(404)
       }
       // "yes"/"no" are legacy (pre-checkbox) values; the checkbox stores a Boolean
@@ -58,6 +58,7 @@ module.exports = function (RED) {
               throw new Error("Test error (metadata)")
             }
             node.receive({
+              __msgSrc: "editor",
               status: "start",
               filename: req.body.filename,
             })
@@ -76,13 +77,13 @@ module.exports = function (RED) {
             if (globalError) {
               globalHash[req.params.id] = null
               globalError = null
-              return node.receive({ status: "error", error: globalError })
+              return node.receive({ __msgSrc: "editor", status: "error", error: globalError })
             }
             //ws.end()
             if (!streaming) {
-              node.receive({ payload: reqBuf })
+              node.receive({ __msgSrc: "editor", payload: reqBuf })
             }
-            node.receive({ status: "success" })
+            node.receive({ __msgSrc: "editor", status: "success" })
             globalHash[req.params.id] = null
             res.sendStatus(200)
           })
@@ -106,6 +107,7 @@ module.exports = function (RED) {
                 // transmitter) can correlate a stream and know its bounds
                 const meta = globalHash[req.params.id]
                 node.receive({
+                  __msgSrc: "editor",
                   payload: data,
                   streamId: meta.streamId,
                   index: meta.index,
@@ -120,7 +122,7 @@ module.exports = function (RED) {
               const per = Math.round((100 * bytes) / globalHash[req.params.id].size)
               if (per != globalHash[req.params.id].per) {
                 globalHash[req.params.id].per = per
-                node.receive({ status: "progress", per })
+                node.receive({ __msgSrc: "editor", status: "progress", per })
               }
             } catch (error) {
               procError(error, "Data error")
@@ -128,7 +130,7 @@ module.exports = function (RED) {
           })
         }
       } catch (error) {
-        node.receive({ status: "error", error })
+        node.receive({ __msgSrc: "editor", status: "error", error })
         globalHash[req.params.id] = null
         res.sendStatus(500)
       }
@@ -140,7 +142,24 @@ module.exports = function (RED) {
     let node = this
     let globalFilename = ""
     let globalDone = false
+    // Properties primed by the most recent wire (non-editor) message; merged
+    // into every output so a message on the input port acts like the button.
+    let receivedMsg = null
     node.on("input", function (inMsg) {
+      // Messages injected by the editor upload are tagged; anything arriving on
+      // the input port is a wire message. A wire message behaves like clicking
+      // the button: it opens the file picker in the editor and its properties
+      // are remembered so they can be merged into the emitted output.
+      if (inMsg.__msgSrc !== "editor") {
+        receivedMsg = inMsg
+        RED.events.emit("runtime-event", {
+          id: `FILE-INPUT-${node._alias || node.id}`,
+          retain: false,
+          payload: { realId: node.id },
+        })
+        return
+      }
+      delete inMsg.__msgSrc
       if (inMsg.hasOwnProperty("status")) {
         if (inMsg.status === "start") {
           node.status({})
@@ -151,6 +170,7 @@ module.exports = function (RED) {
         }
         if (inMsg.status === "success") {
           globalDone = true
+          receivedMsg = null
         }
         if (inMsg.status === "progress" && globalDone) {
           return
@@ -163,6 +183,7 @@ module.exports = function (RED) {
             : "red"
         const shape = "dot"
         if (inMsg.status === "error") {
+          receivedMsg = null
           node.error(
             errorMsg("fileinput.errors.failed", { error: inMsg.error.toString() })
           )
@@ -177,10 +198,11 @@ module.exports = function (RED) {
       const prop = config.property
       let type = config.datatype
       const streaming = config.stream === true || config.stream === "yes"
-      let outMsg = {
-        filename: globalFilename,
-        end: streaming ? inMsg.end : true,
-      }
+      // Start from a clone of the wire message (if any) so its properties ride
+      // along on every emitted message; the node's own properties win below.
+      let outMsg = receivedMsg ? RED.util.cloneMessage(receivedMsg) : {}
+      outMsg.filename = globalFilename
+      outMsg.end = streaming ? inMsg.end : true
       if (streaming) {
         outMsg.streamId = inMsg.streamId
         outMsg.index = inMsg.index
