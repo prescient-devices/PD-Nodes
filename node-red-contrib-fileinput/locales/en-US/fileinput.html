@@ -17,16 +17,29 @@
     <dd>The user-selected file base name.</dd>
     <dt class="optional">end<span class="property-type">Boolean</span></dt>
     <dd>
-      Flag that indicates whether the message is the last message containing a chunk of
-      the user-selected file or not. If streaming mode is not selected this flag is
-      always <code>false</code>.
+      Flag that indicates whether the message is the last (or only) message containing a
+      chunk of the user-selected file. When streaming is not selected a single message
+      is emitted with the whole file and this flag is <code>true</code>.
     </dd>
+    <dt class="optional">start<span class="property-type">Boolean</span></dt>
+    <dd>Streaming only. <code>true</code> on the first chunk of the file.</dd>
+    <dt class="optional">streamId<span class="property-type">string</span></dt>
+    <dd>
+      Streaming only. Identifier shared by every chunk of one file, so downstream nodes
+      can correlate the chunks of a single stream.
+    </dd>
+    <dt class="optional">index<span class="property-type">number</span></dt>
+    <dd>Streaming only. Zero-based position of the chunk within the file.</dd>
+    <dt class="optional">size<span class="property-type">number</span></dt>
+    <dd>Streaming only. Total size of the selected file, in bytes.</dd>
   </dl>
   <h3>Details</h3>
   <p>
     After clicking the input button the user is prompted to select a file from the
-    browser's file system. The file may be streamed (multiple messages may be emitted
-    containing chunks of the file) or loaded all at once (only one output message is
-    emitted with the entire contents of the selected file).
+    browser's file system. When streaming is selected the file is streamed as multiple
+    messages, each carrying a chunk of the file along with <code>streamId</code>,
+    <code>index</code>, <code>start</code>, <code>end</code> and <code>size</code> so
+    downstream nodes can reassemble or forward it. When it is not selected the file is
+    loaded all at once and a single output message is emitted with the entire contents.
   </p>
 </script>

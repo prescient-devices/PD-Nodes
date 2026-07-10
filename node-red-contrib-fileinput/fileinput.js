@@ -20,6 +20,7 @@ module.exports = function (RED) {
     return globalIsInTest ? arg1 : RED._(arg1, arg2)
   }
   let globalHash = {}
+  let globalStreamSeq = 0
   RED.httpAdmin.post(
     "/node-red-contrib-fileinput/file/:id",
     RED.auth.needsPermission("node-red-contrib-fileinput.write"),
@@ -45,6 +46,8 @@ module.exports = function (RED) {
         node.receive({ status: "error", error: globalError })
         return res.sendStatus(404)
       }
+      // "yes"/"no" are legacy (pre-checkbox) values; the checkbox stores a Boolean
+      const streaming = config.stream === true || config.stream === "yes"
       try {
         if (globalFailMode === "GENERAL") {
           throw new Error("Test error (general)")
@@ -59,7 +62,12 @@ module.exports = function (RED) {
               filename: req.body.filename,
             })
             let size = Math.max(1, req.body.size)
-            globalHash[req.params.id] = { size, per: 0 }
+            globalHash[req.params.id] = {
+              size,
+              per: 0,
+              streamId: `${Date.now().toString(36)}${(globalStreamSeq++).toString(36)}`,
+              index: 0,
+            }
             return res.sendStatus(200)
           }
           let reqBuf = new Buffer.from("")
@@ -71,7 +79,7 @@ module.exports = function (RED) {
               return node.receive({ status: "error", error: globalError })
             }
             //ws.end()
-            if (config.stream === "no") {
+            if (!streaming) {
               node.receive({ payload: reqBuf })
             }
             node.receive({ status: "success" })
@@ -93,11 +101,19 @@ module.exports = function (RED) {
                 throw new Error("Test error (DATA)")
               }
               bytes += data.length
-              if (config.stream === "yes") {
+              if (streaming) {
+                // self-describing envelope so downstream nodes (e.g. a paced
+                // transmitter) can correlate a stream and know its bounds
+                const meta = globalHash[req.params.id]
                 node.receive({
                   payload: data,
-                  end: bytes === globalHash[req.params.id].size,
+                  streamId: meta.streamId,
+                  index: meta.index,
+                  start: meta.index === 0,
+                  end: bytes === meta.size,
+                  size: meta.size,
                 })
+                meta.index++
               } else {
                 reqBuf = Buffer.concat([reqBuf, data])
               }
@@ -160,9 +176,16 @@ module.exports = function (RED) {
       let payload = inMsg.payload
       const prop = config.property
       let type = config.datatype
+      const streaming = config.stream === true || config.stream === "yes"
       let outMsg = {
         filename: globalFilename,
-        end: config.stream === "no" ? true : inMsg.end,
+        end: streaming ? inMsg.end : true,
+      }
+      if (streaming) {
+        outMsg.streamId = inMsg.streamId
+        outMsg.index = inMsg.index
+        outMsg.start = inMsg.start
+        outMsg.size = inMsg.size
       }
       outMsg[prop] = payload
       try {
