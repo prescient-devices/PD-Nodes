@@ -28,6 +28,9 @@ function _capitalize(arg) {
 
 function getFlow(config) {
   config = config || {}
+  if (config.backpressure) {
+    return getBackpressureFlow(config)
+  }
   let flowArray = [
     {
       id: "f95964b82673fe40",
@@ -81,6 +84,85 @@ function getFlow(config) {
     },
   ]
   return flowArray
+}
+
+// Flow for exercising streaming backpressure end to end:
+//   fileinput (stream + backpressure) -> fileinput-backpressure -> accumulate -> file
+// The fileinput-backpressure node sits directly downstream of the fileinput node
+// so it sees (and acknowledges) every chunk; the accumulator reassembles the
+// whole file and emits it once on the final chunk, and reports the chunk count.
+function getBackpressureFlow(config) {
+  const z = "f95964b82673fe40"
+  const bpId = "bp00000000000001"
+  const funcId = "a189a1e310b89cd0"
+  const fileId = "9036244af13e1199"
+  const accumulate = [
+    'let data = flow.get("acc") || ""',
+    "data += msg.payload",
+    "if (msg.end) {",
+    '  flow.set("acc", "")',
+    "  msg.payload = data",
+    "  node.warn(msg.index + 1)",
+    "  return msg",
+    "}",
+    'flow.set("acc", data)',
+    "return null",
+  ].join("\n")
+  return [
+    { id: z, type: "tab", label: "Test flow", disabled: false, info: "", env: [] },
+    {
+      id: "fbeed8ed651b1fff",
+      type: "fileinput",
+      z: z,
+      name: "Load file",
+      datatype: config.datatype || "str",
+      stream: config.stream || "yes",
+      backpressure: true,
+      property: config.property || "payload",
+      propertyType: "msg",
+      x: 130,
+      y: 80,
+      wires: [[bpId]],
+    },
+    {
+      id: bpId,
+      type: "fileinput-backpressure",
+      z: z,
+      name: "Ack",
+      x: 300,
+      y: 80,
+      wires: [[funcId]],
+    },
+    {
+      id: funcId,
+      type: "function",
+      z: z,
+      name: "Process",
+      func: accumulate,
+      outputs: 1,
+      noerr: 0,
+      initialize: "",
+      finalize: "",
+      libs: [],
+      x: 460,
+      y: 80,
+      wires: [[fileId]],
+    },
+    {
+      id: fileId,
+      type: "file",
+      z: z,
+      name: "Save file",
+      filename: globalOutFile,
+      appendNewline: false,
+      createDir: false,
+      overwriteFile: "true",
+      encoding: "none",
+      x: 620,
+      y: 80,
+      wires: [[]],
+    },
+  ]
 }
 
 function delay(ms) {
@@ -298,6 +380,21 @@ describe("node-red-contrib-fileinput", function () {
       await runTest({ datatype: "obj" }, "A", env)
       const act = getNodeMessages(stdout)
       act.should.equal("fileinput.errors.conversion")
+    })
+  })
+  describe("Streaming backpressure", function () {
+    it("Paces a multi-chunk streamed upload and reassembles the file", async function () {
+      // Large enough that the HTTP request is delivered as many `data` events;
+      // reassembly can only complete if every chunk is acknowledged and the next
+      // is released, so a broken ack loop would stall (aborting after the 30s
+      // watchdog) and leave the saved file incomplete.
+      const data = "0123456789".repeat(50000) // ~500 KB of single-byte ASCII
+      const act = await runTest({ backpressure: true }, data)
+      act.should.eql({ stdout: "fileinput.notification.success" })
+      const saved = fs.readFileSync(globalOutFile).toString()
+      saved.should.equal(data)
+      const chunkCount = Number(getNodeMessages(stdout))
+      chunkCount.should.be.above(1)
     })
   })
 })

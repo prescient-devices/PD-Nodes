@@ -13,6 +13,11 @@
          <option value="yes" data-i18n="fileinput.stream_options.yes"></option>
        </select>
    </div>
+  <div class="form-row" id="input-backpressure">
+     <label>&nbsp;</label>
+     <input type="checkbox" id="node-input-backpressure" style="display: inline-block; width: auto; vertical-align: top;">
+     <label for="node-input-backpressure" style="width: auto;"><span data-i18n="fileinput.label.backpressure"></span></label>
+   </div>
   <div class="form-row">
        <label for="node-input-typed-property"><i class="fa fa-sitemap" style="width: 20px;"></i> <span data-i18n="fileinput.label.property"></span></label>
        <input type="text" id="node-input-typed-property" data-i18n="[placeholder]fileinputlabel.payload" style="width: 339.19px;">
@@ -26,6 +31,13 @@
          <option value="obj" data-i18n="fileinput.type_options.obj"></option>
          <option value="buf" data-i18n="fileinput.type_options.buf"></option>
        </select>
+   </div>
+</script>
+
+<script type="text/x-red" data-template-name="fileinput-backpressure">
+  <div class="form-row node-input-name">
+     <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="fileinput.label.name"></span></label>
+     <input type="text" id="node-input-name" data-i18n="[placeholder]fileinput.label.name" style="width: 339.19px;">
    </div>
 </script>
 
@@ -134,6 +146,7 @@
         name: { value: "" },
         datatype: { value: "str" },
         stream: { value: "no" },
+        backpressure: { value: false },
         property: { value: "payload", required: true },
         propertyType: { value: "msg" },
       },
@@ -149,6 +162,13 @@
         },
       },
       oneditprepare: function () {
+        // The backpressure option only applies when streaming, so its checkbox
+        // is shown only while the stream selector is set to "yes".
+        function toggleBackpressure() {
+          $("#input-backpressure").toggle($("#node-input-stream").val() === "yes")
+        }
+        $("#node-input-stream").on("change", toggleBackpressure)
+        toggleBackpressure()
         $("#node-input-typed-property").typedInput({
           default: "msg",
           types: ["msg"],
@@ -167,6 +187,19 @@
           }
           value = $("#node-input-property").val(value)
         })
+      },
+    })
+    RED.nodes.registerType("fileinput-backpressure", {
+      category: "prescient",
+      color: "rgb(74, 179, 255)",
+      defaults: {
+        name: { value: "" },
+      },
+      inputs: 1,
+      outputs: 1,
+      icon: "file-in.svg",
+      label: function () {
+        return this.name || "file input backpressure"
       },
     })
   })()

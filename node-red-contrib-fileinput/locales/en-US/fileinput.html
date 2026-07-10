@@ -53,4 +53,26 @@
     downstream nodes can reassemble or forward it. When it is not selected the file is
     loaded all at once and a single output message is emitted with the entire contents.
   </p>
+  <p>
+    When streaming, the <b>Use backpressure</b> option pauses reading of the uploaded
+    file after each chunk until a downstream <code>fileinput backpressure</code> node
+    acknowledges it, so at most one chunk is in flight at a time and a slow consumer
+    cannot cause unbounded queuing. If no acknowledgement arrives within 30 seconds the
+    upload is aborted, so a <code>fileinput backpressure</code> node must be wired on the
+    stream path when this option is enabled.
+  </p>
+</script>
+
+<script type="text/html" data-help-name="fileinput-backpressure">
+  <p>
+    Paces a <code>fileinput</code> node that is streaming with the <b>Use backpressure</b>
+    option enabled. Place this node downstream of the work that consumes each chunk; when
+    a chunk reaches it, it acknowledges the chunk so the upstream node releases the next
+    one. The message is passed through unchanged.
+  </p>
+  <p>
+    The acknowledgement is correlated to its upload by the <code>streamId</code> carried
+    on every streamed message, so this node must sit on the same stream path as the
+    originating <code>fileinput</code> node.
+  </p>
 </script>

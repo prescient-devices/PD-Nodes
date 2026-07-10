@@ -21,6 +21,13 @@ module.exports = function (RED) {
   }
   let globalHash = {}
   let globalStreamSeq = 0
+  // streamId -> { resume }. A streaming upload with backpressure enabled parks
+  // its resume handle here so a downstream fileinput-backpressure node can
+  // release the next chunk once the current one has been consumed.
+  let globalStreamControls = {}
+  // How long an upload waits for a chunk acknowledgement before it gives up
+  // (e.g. the fileinput-backpressure node is missing or its consumer stalled).
+  const globalBpTimeoutMs = 30 * 1000
   RED.httpAdmin.post(
     "/node-red-contrib-fileinput/file/:id",
     RED.auth.needsPermission("node-red-contrib-fileinput.write"),
@@ -48,6 +55,42 @@ module.exports = function (RED) {
       }
       // "yes"/"no" are legacy (pre-checkbox) values; the checkbox stores a Boolean
       const streaming = config.stream === true || config.stream === "yes"
+      const backpressure =
+        streaming && (config.backpressure === true || config.backpressure === "yes")
+      // Backpressure watchdog: armed whenever the socket is paused waiting for a
+      // downstream acknowledgement, cleared when the ack (or an end/error) lands.
+      let bpTimer = null
+      function clearBpTimer() {
+        if (bpTimer) {
+          clearTimeout(bpTimer)
+          bpTimer = null
+        }
+      }
+      function cleanupBp() {
+        clearBpTimer()
+        const meta = globalHash[req.params.id]
+        if (meta && meta.streamId) {
+          delete globalStreamControls[meta.streamId]
+        }
+      }
+      function armBpTimer(streamId) {
+        clearBpTimer()
+        bpTimer = setTimeout(function () {
+          // No downstream node acknowledged the last chunk; abort so the request
+          // and node status do not hang indefinitely.
+          delete globalStreamControls[streamId]
+          procError(new Error("Backpressure acknowledgement timeout"), "Backpressure timeout")
+          globalHash[req.params.id] = null
+          try {
+            req.destroy()
+          } catch (_) {}
+          node.receive({
+            __msgSrc: "editor",
+            status: "error",
+            error: "Backpressure acknowledgement timeout",
+          })
+        }, globalBpTimeoutMs)
+      }
       try {
         if (globalFailMode === "GENERAL") {
           throw new Error("Test error (general)")
@@ -74,6 +117,7 @@ module.exports = function (RED) {
           let reqBuf = new Buffer.from("")
           let bytes = 0
           req.on("end", function () {
+            cleanupBp()
             if (globalError) {
               globalHash[req.params.id] = null
               globalError = null
@@ -88,6 +132,7 @@ module.exports = function (RED) {
             res.sendStatus(200)
           })
           req.on("error", function (error) {
+            cleanupBp()
             procError(error, "Request error")
           })
           if (globalFailMode === "RECEIVER") {
@@ -106,7 +151,7 @@ module.exports = function (RED) {
                 // self-describing envelope so downstream nodes (e.g. a paced
                 // transmitter) can correlate a stream and know its bounds
                 const meta = globalHash[req.params.id]
-                node.receive({
+                const chunkMsg = {
                   __msgSrc: "editor",
                   payload: data,
                   streamId: meta.streamId,
@@ -114,8 +159,26 @@ module.exports = function (RED) {
                   start: meta.index === 0,
                   end: bytes === meta.size,
                   size: meta.size,
-                })
+                }
                 meta.index++
+                if (backpressure) {
+                  // Stop consuming the socket until a downstream
+                  // fileinput-backpressure node acknowledges this chunk by
+                  // resuming the stream. Because reads stop, TCP flow control
+                  // propagates back to the HTTP client and at most one chunk is
+                  // in flight through the flow at a time. Pause and register the
+                  // resume handle BEFORE dispatching the chunk, so the ack is
+                  // honoured even if Node-RED delivers the message synchronously.
+                  req.pause()
+                  armBpTimer(meta.streamId)
+                  globalStreamControls[meta.streamId] = {
+                    resume: function () {
+                      clearBpTimer()
+                      req.resume()
+                    },
+                  }
+                }
+                node.receive(chunkMsg)
               } else {
                 reqBuf = Buffer.concat([reqBuf, data])
               }
@@ -226,4 +289,31 @@ module.exports = function (RED) {
     })
   }
   RED.nodes.registerType("fileinput", FileInput)
+
+  // Companion pace-gate for streaming uploads with backpressure enabled. Placed
+  // downstream of the work that consumes each chunk, it acknowledges a chunk
+  // (by streamId) once the chunk reaches it, letting the fileinput node release
+  // the next one. The message is passed through unchanged.
+  function FileInputBackpressure(config) {
+    RED.nodes.createNode(this, config)
+    let node = this
+    node.on("input", function (msg, send, done) {
+      send = send || node.send.bind(node)
+      const streamId = msg.streamId
+      const ctrl = streamId ? globalStreamControls[streamId] : null
+      if (ctrl) {
+        // On the final chunk this also lets the HTTP request end so the
+        // fileinput node emits its "success" status.
+        if (msg.end) {
+          delete globalStreamControls[streamId]
+        }
+        ctrl.resume()
+      }
+      send(msg)
+      if (done) {
+        done()
+      }
+    })
+  }
+  RED.nodes.registerType("fileinput-backpressure", FileInputBackpressure)
 }
