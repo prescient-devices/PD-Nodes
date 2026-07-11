@@ -79,7 +79,10 @@ module.exports = function (RED) {
           // No downstream node acknowledged the last chunk; abort so the request
           // and node status do not hang indefinitely.
           delete globalStreamControls[streamId]
-          procError(new Error("Backpressure acknowledgement timeout"), "Backpressure timeout")
+          procError(
+            new Error("Backpressure acknowledgement timeout"),
+            "Backpressure timeout"
+          )
           globalHash[req.params.id] = null
           try {
             req.destroy()
@@ -100,20 +103,87 @@ module.exports = function (RED) {
             if (globalFailMode === "METADATA") {
               throw new Error("Test error (metadata)")
             }
+            // Concurrency guard: only one streaming upload may be in flight per
+            // fileinput node. globalHash[id] holds a non-null object for the life of
+            // an upload (cleared to null on end/error/timeout), so a truthy entry
+            // here means a prior upload is still draining. A second metadata POST
+            // would clobber this node's streamId/index, crossing the two streams so
+            // the receiver appends both and the file grows past its declared size.
+            // Reject the overlapping POST instead of overwriting live state.
+            const inFlight = globalHash[req.params.id]
+            if (inFlight && inFlight.streamId) {
+              node.warn(
+                `fileinput: rejected overlapping upload on node ${req.params.id}; ` +
+                  `stream ${inFlight.streamId} still in flight (chunk index ${inFlight.index})`
+              )
+              return res.status(409).json({
+                error: "upload already in progress",
+                streamId: inFlight.streamId,
+              })
+            }
             node.receive({
               __msgSrc: "editor",
               status: "start",
               filename: req.body.filename,
             })
             let size = Math.max(1, req.body.size)
+            // Prefix the streamId with the node id so a second fileinput node's
+            // streams can never collide with this one's in shared module state.
+            const streamSuffix =
+              Date.now().toString(36) + (globalStreamSeq++).toString(36)
+            const streamId = `${req.params.id}-${streamSuffix}`
             globalHash[req.params.id] = {
               size,
               per: 0,
-              streamId: `${Date.now().toString(36)}${(globalStreamSeq++).toString(36)}`,
+              streamId,
               index: 0,
             }
             return res.sendStatus(200)
           }
+          // --- data-body request (the file bytes) ---
+          // One upload is TWO requests: the metadata POST above (which created
+          // globalHash[nodeId] with the streamId + index) and this data POST. A
+          // proxy or the browser can REPLAY the data body WITHOUT re-posting
+          // metadata (e.g. a load balancer re-issuing the upload as a second request,
+          // or a connection-reuse retry). That replay reuses the live
+          // globalHash[nodeId] — continuing the shared index and streamId while
+          // restarting its own byte counter — so two streams cross into the
+          // receiver and the file grows past its real size. The metadata guard
+          // above cannot see it (the replay never posts metadata). Guard the DATA
+          // path directly: the first data request claims the node's stream; a
+          // second concurrent data request is rejected instead of sharing state.
+          const reqNonce = `${Date.now().toString(36)}${(globalStreamSeq++).toString(
+            36
+          )}`
+          const reqSrc =
+            req.headers["x-forwarded-for"] ||
+            (req.socket && req.socket.remoteAddress) ||
+            "?"
+          const reqLen = req.headers["content-length"] || "?"
+          const claim = globalHash[req.params.id]
+          if (!claim) {
+            // data body with no active manifest (orphaned or replayed after the
+            // stream already completed) — drop it rather than crash on meta.size
+            node.warn(
+              `fileinput: data POST for node ${req.params.id} with no active stream ` +
+                `(req ${reqNonce}, src ${reqSrc}, len ${reqLen}); ignoring`
+            )
+            return res.status(409).json({ error: "no active stream" })
+          }
+          if (claim.dataOwner && claim.dataOwner !== reqNonce) {
+            // another data request already owns this node's stream -> this is the
+            // duplicate/replayed body. Reject it; do NOT touch globalHash (that
+            // would kill the legitimate in-flight upload).
+            node.warn(
+              `fileinput: rejected duplicate data POST on node ${req.params.id} ` +
+                `(req ${reqNonce}, src ${reqSrc}, len ${reqLen}); stream ${claim.streamId} ` +
+                `already owned by ${claim.dataOwner} at index ${claim.index}`
+            )
+            return res
+              .status(409)
+              .json({ error: "upload already streaming", streamId: claim.streamId })
+          }
+          claim.dataOwner = reqNonce
           let reqBuf = new Buffer.from("")
           let bytes = 0
           req.on("end", function () {
@@ -121,7 +191,11 @@ module.exports = function (RED) {
             if (globalError) {
               globalHash[req.params.id] = null
               globalError = null
-              return node.receive({ __msgSrc: "editor", status: "error", error: globalError })
+              return node.receive({
+                __msgSrc: "editor",
+                status: "error",
+                error: globalError,
+              })
             }
             //ws.end()
             if (!streaming) {
@@ -147,10 +221,17 @@ module.exports = function (RED) {
                 throw new Error("Test error (DATA)")
               }
               bytes += data.length
+              // Single consistent snapshot of this node's stream state for the whole
+              // handler, and the node's own view of progress (bytes received on this
+              // request / declared size). `percent` should rise monotonically across
+              // consecutive chunks of one streamId; if a downstream capture sees it
+              // drop, this node's state was clobbered mid-upload (a second upload to
+              // the same node) — the chunk before and after the drop bracket it.
+              const meta = globalHash[req.params.id]
+              const per = Math.round((100 * bytes) / meta.size)
               if (streaming) {
                 // self-describing envelope so downstream nodes (e.g. a paced
                 // transmitter) can correlate a stream and know its bounds
-                const meta = globalHash[req.params.id]
                 const chunkMsg = {
                   __msgSrc: "editor",
                   payload: data,
@@ -159,6 +240,8 @@ module.exports = function (RED) {
                   start: meta.index === 0,
                   end: bytes === meta.size,
                   size: meta.size,
+                  bytes,
+                  percent: per,
                 }
                 meta.index++
                 if (backpressure) {
@@ -182,9 +265,8 @@ module.exports = function (RED) {
               } else {
                 reqBuf = Buffer.concat([reqBuf, data])
               }
-              const per = Math.round((100 * bytes) / globalHash[req.params.id].size)
-              if (per != globalHash[req.params.id].per) {
-                globalHash[req.params.id].per = per
+              if (per != meta.per) {
+                meta.per = per
                 node.receive({ __msgSrc: "editor", status: "progress", per })
               }
             } catch (error) {
@@ -271,6 +353,8 @@ module.exports = function (RED) {
         outMsg.index = inMsg.index
         outMsg.start = inMsg.start
         outMsg.size = inMsg.size
+        outMsg.bytes = inMsg.bytes
+        outMsg.percent = inMsg.percent
       }
       outMsg[prop] = payload
       try {
