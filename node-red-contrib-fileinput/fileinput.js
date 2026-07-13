@@ -25,6 +25,16 @@ module.exports = function (RED) {
   // its resume handle here so a downstream fileinput-backpressure node can
   // release the next chunk once the current one has been consumed.
   let globalStreamControls = {}
+  // streamId -> { committedIndex }. How many fixed-size blocks the receiver has
+  // durably acknowledged, tracked by the fileinput-backpressure node from each
+  // ack. A replayed/retried upload (see the data-path notes below) reuses this to
+  // fast-forward past the blocks already delivered and resume from committedIndex,
+  // instead of re-sending the whole file and crossing streams.
+  let globalStreamProgress = {}
+  // Fixed streaming block size. Framing the upload into fixed-size blocks makes
+  // block N always the same bytes ([N*FIXED, (N+1)*FIXED)) regardless of how the
+  // HTTP body is split across `data` events, so a replay can resume by block index.
+  const globalStreamBlock = 64 * 1024
   // How long an upload waits for a chunk acknowledgement before it gives up
   // (e.g. the fileinput-backpressure node is missing or its consumer stalled).
   const globalBpTimeoutMs = 30 * 1000
@@ -170,42 +180,214 @@ module.exports = function (RED) {
             )
             return res.status(409).json({ error: "no active stream" })
           }
-          if (claim.dataOwner && claim.dataOwner !== reqNonce) {
-            // another data request already owns this node's stream -> this is the
-            // duplicate/replayed body. Reject it; do NOT touch globalHash (that
-            // would kill the legitimate in-flight upload).
+          if (!streaming) {
+            // ---- non-streaming: buffer the whole body, emit once at end ----
+            // A replayed body here would just re-emit the file; reject a second
+            // concurrent data request rather than double-emit.
+            if (claim.dataOwner && claim.dataOwner !== reqNonce) {
+              node.warn(
+                `fileinput: rejected duplicate data POST on node ${req.params.id} ` +
+                  `(req ${reqNonce}, src ${reqSrc}, len ${reqLen}); already owned by ` +
+                  `${claim.dataOwner}`
+              )
+              return res.status(409).json({ error: "upload already in progress" })
+            }
+            claim.dataOwner = reqNonce
+            let reqBuf = new Buffer.from("")
+            let bytes = 0
+            req.on("end", function () {
+              cleanupBp()
+              if (globalError) {
+                globalHash[req.params.id] = null
+                globalError = null
+                return node.receive({
+                  __msgSrc: "editor",
+                  status: "error",
+                  error: globalError,
+                })
+              }
+              node.receive({ __msgSrc: "editor", payload: reqBuf })
+              node.receive({ __msgSrc: "editor", status: "success" })
+              globalHash[req.params.id] = null
+              res.sendStatus(200)
+            })
+            req.on("error", function (error) {
+              cleanupBp()
+              procError(error, "Request error")
+            })
+            if (globalFailMode === "RECEIVER") {
+              req.emit("error")
+            }
+            req.on("data", (data) => {
+              try {
+                if (globalError) {
+                  return
+                }
+                if (globalFailMode === "DATA") {
+                  throw new Error("Test error (DATA)")
+                }
+                bytes += data.length
+                reqBuf = Buffer.concat([reqBuf, data])
+                const meta = globalHash[req.params.id]
+                const per = Math.round((100 * bytes) / meta.size)
+                if (per != meta.per) {
+                  meta.per = per
+                  node.receive({ __msgSrc: "editor", status: "progress", per })
+                }
+              } catch (error) {
+                procError(error, "Data error")
+              }
+            })
+            return
+          }
+          // ---- streaming: fixed-size framing + resume-by-index ----
+          // The upload is framed into fixed globalStreamBlock-sized blocks so block
+          // N is always the same bytes no matter how the HTTP body splits across
+          // `data` events. If another data request already owns this stream, this
+          // POST is a replay/retry (e.g. a load balancer re-issuing the upload as a
+          // second request): rather than reject it and lose the transfer, ADOPT it —
+          // supersede the previous owner and resume from the last acknowledged block
+          // index, fast-forwarding (dropping) the blocks already delivered.
+          const streamId = claim.streamId
+          const progress =
+            globalStreamProgress[streamId] ||
+            (globalStreamProgress[streamId] = { committedIndex: 0 })
+          if (claim.dataOwner && claim.dataOwner !== reqNonce && claim.supersede) {
             node.warn(
-              `fileinput: rejected duplicate data POST on node ${req.params.id} ` +
-                `(req ${reqNonce}, src ${reqSrc}, len ${reqLen}); stream ${claim.streamId} ` +
-                `already owned by ${claim.dataOwner} at index ${claim.index}`
+              `fileinput: adopting replayed data POST on node ${req.params.id} ` +
+                `(req ${reqNonce}, src ${reqSrc}, len ${reqLen}); superseding ` +
+                `${claim.dataOwner}, resuming stream ${streamId} at committed index ` +
+                `${progress.committedIndex}`
             )
-            return res
-              .status(409)
-              .json({ error: "upload already streaming", streamId: claim.streamId })
+            claim.supersede() // destroy the previous owner's request, silence it
           }
           claim.dataOwner = reqNonce
-          let reqBuf = new Buffer.from("")
-          let bytes = 0
-          req.on("end", function () {
+          let acc = Buffer.alloc(0) // fixed-block framing accumulator
+          let blockIndex = 0 // next block number this request will produce
+          let ended = false // request body fully received
+          let waiting = false // paused awaiting a downstream ack
+          let pumping = false // re-entrancy guard for pump()
+          let finished = false // success emitted once
+          let superseded = false // a newer data POST took over this stream
+          // Let a future replay supersede THIS request: mark it silenced, clear its
+          // watchdog, and destroy its socket so it stops feeding the stream.
+          claim.supersede = function () {
+            superseded = true
+            clearBpTimer()
+            try {
+              req.destroy()
+            } catch (_) {}
+          }
+          const finishOk = function () {
+            if (finished || superseded) {
+              return
+            }
+            finished = true
             cleanupBp()
-            if (globalError) {
-              globalHash[req.params.id] = null
-              globalError = null
-              return node.receive({
-                __msgSrc: "editor",
-                status: "error",
-                error: globalError,
-              })
-            }
-            //ws.end()
-            if (!streaming) {
-              node.receive({ __msgSrc: "editor", payload: reqBuf })
-            }
             node.receive({ __msgSrc: "editor", status: "success" })
             globalHash[req.params.id] = null
-            res.sendStatus(200)
+            delete globalStreamProgress[streamId]
+            try {
+              res.sendStatus(200)
+            } catch (_) {}
+          }
+          const pump = function () {
+            if (superseded || pumping) {
+              return
+            }
+            pumping = true
+            try {
+              while (!waiting && !superseded) {
+                const isFull = acc.length >= globalStreamBlock
+                const isFinalPartial = ended && acc.length > 0 && !isFull
+                if (!isFull && !isFinalPartial) {
+                  break
+                }
+                const take = isFull ? globalStreamBlock : acc.length
+                const block = Buffer.from(acc.subarray(0, take))
+                acc = acc.subarray(take)
+                const N = blockIndex++
+                if (N < progress.committedIndex) {
+                  // already durably received — this is a resume re-sending a
+                  // delivered prefix. Drop it with no downstream round-trip so the
+                  // socket keeps flowing and fast-forwards to the resume point.
+                  continue
+                }
+                const meta = globalHash[req.params.id]
+                if (!meta) {
+                  superseded = true
+                  break
+                }
+                meta.index = N
+                const isLast = ended && acc.length === 0
+                const fwdBytes = Math.min((N + 1) * globalStreamBlock, meta.size)
+                const per = meta.size ? Math.round((100 * fwdBytes) / meta.size) : 0
+                if (per != meta.per) {
+                  meta.per = per
+                  node.receive({ __msgSrc: "editor", status: "progress", per })
+                }
+                const chunkMsg = {
+                  __msgSrc: "editor",
+                  payload: block,
+                  streamId: meta.streamId,
+                  index: N,
+                  start: N === 0,
+                  end: isLast,
+                  size: meta.size,
+                  bytes: fwdBytes,
+                  percent: per,
+                }
+                if (backpressure) {
+                  // Pause reads until the fileinput-backpressure node acks this
+                  // block; register the resume BEFORE dispatching so a synchronous
+                  // ack does not race the pause. Resume re-enters pump().
+                  waiting = true
+                  req.pause()
+                  armBpTimer(meta.streamId)
+                  globalStreamControls[meta.streamId] = {
+                    resume: function () {
+                      clearBpTimer()
+                      waiting = false
+                      if (superseded) {
+                        return
+                      }
+                      req.resume()
+                      pump()
+                    },
+                  }
+                }
+                node.receive(chunkMsg)
+                if (waiting) {
+                  break
+                }
+              }
+            } catch (error) {
+              procError(error, "Data error")
+            } finally {
+              pumping = false
+            }
+            if (!superseded && ended && acc.length === 0 && !waiting) {
+              finishOk()
+            }
+          }
+          req.on("end", function () {
+            if (superseded) {
+              return
+            }
+            if (globalError) {
+              cleanupBp()
+              const e = globalError
+              globalHash[req.params.id] = null
+              globalError = null
+              return node.receive({ __msgSrc: "editor", status: "error", error: e })
+            }
+            ended = true
+            pump()
           })
           req.on("error", function (error) {
+            if (superseded) {
+              return // the socket was destroyed on purpose during an adopt
+            }
             cleanupBp()
             procError(error, "Request error")
           })
@@ -214,61 +396,14 @@ module.exports = function (RED) {
           }
           req.on("data", (data) => {
             try {
-              if (globalError) {
+              if (globalError || superseded) {
                 return
               }
               if (globalFailMode === "DATA") {
                 throw new Error("Test error (DATA)")
               }
-              bytes += data.length
-              // Single consistent snapshot of this node's stream state for the whole
-              // handler, and the node's own view of progress (bytes received on this
-              // request / declared size). `percent` should rise monotonically across
-              // consecutive chunks of one streamId; if a downstream capture sees it
-              // drop, this node's state was clobbered mid-upload (a second upload to
-              // the same node) — the chunk before and after the drop bracket it.
-              const meta = globalHash[req.params.id]
-              const per = Math.round((100 * bytes) / meta.size)
-              if (streaming) {
-                // self-describing envelope so downstream nodes (e.g. a paced
-                // transmitter) can correlate a stream and know its bounds
-                const chunkMsg = {
-                  __msgSrc: "editor",
-                  payload: data,
-                  streamId: meta.streamId,
-                  index: meta.index,
-                  start: meta.index === 0,
-                  end: bytes === meta.size,
-                  size: meta.size,
-                  bytes,
-                  percent: per,
-                }
-                meta.index++
-                if (backpressure) {
-                  // Stop consuming the socket until a downstream
-                  // fileinput-backpressure node acknowledges this chunk by
-                  // resuming the stream. Because reads stop, TCP flow control
-                  // propagates back to the HTTP client and at most one chunk is
-                  // in flight through the flow at a time. Pause and register the
-                  // resume handle BEFORE dispatching the chunk, so the ack is
-                  // honoured even if Node-RED delivers the message synchronously.
-                  req.pause()
-                  armBpTimer(meta.streamId)
-                  globalStreamControls[meta.streamId] = {
-                    resume: function () {
-                      clearBpTimer()
-                      req.resume()
-                    },
-                  }
-                }
-                node.receive(chunkMsg)
-              } else {
-                reqBuf = Buffer.concat([reqBuf, data])
-              }
-              if (per != meta.per) {
-                meta.per = per
-                node.receive({ __msgSrc: "editor", status: "progress", per })
-              }
+              acc = acc.length ? Buffer.concat([acc, data]) : data
+              pump()
             } catch (error) {
               procError(error, "Data error")
             }
@@ -384,6 +519,22 @@ module.exports = function (RED) {
     node.on("input", function (msg, send, done) {
       send = send || node.send.bind(node)
       const streamId = msg.streamId
+      // Record how far the receiver has durably committed, so a replayed/retried
+      // upload can resume from committedIndex instead of re-sending from the start.
+      // A success ack for block seq means blocks 0..seq are on disk -> next needed
+      // block is seq + 1.
+      if (
+        streamId &&
+        globalStreamProgress[streamId] &&
+        msg.payload &&
+        msg.payload.ok &&
+        typeof msg.payload.ackSeq === "number"
+      ) {
+        const nextNeeded = msg.payload.ackSeq + 1
+        if (nextNeeded > globalStreamProgress[streamId].committedIndex) {
+          globalStreamProgress[streamId].committedIndex = nextNeeded
+        }
+      }
       const ctrl = streamId ? globalStreamControls[streamId] : null
       if (ctrl) {
         // On the final chunk this also lets the HTTP request end so the
