@@ -59,7 +59,16 @@
     // its arming event on the shared template id, so keying on the editor id
     // made a second instance silently overwrite the first one's target and the
     // file went to whichever instance armed last.
-    const globalPending = {}
+    //
+    // Object.create(null) here and for globalPicksInFlight below, as the runtime
+    // script does for the maps it keys the same way. That key arrives over the
+    // comms channel, and on a plain object "__proto__" is not a key at all: it
+    // runs the inherited accessor, so a read hands back Object.prototype and the
+    // truthiness guards below take it for a live entry - one that can never be
+    // deleted. The prompt for such a node would then be suppressed as already
+    // armed and its button reported busy for the life of the session. Nothing
+    // reads either map by a dotted property name or calls hasOwnProperty() on it.
+    const globalPending = Object.create(null)
     // How long to wait after the browser window regains focus before deciding
     // that the picker was dismissed without a file being chosen. The `change`
     // event is not guaranteed to arrive before the focus event, so it is given
@@ -71,8 +80,8 @@
     // Runtime node id -> pick token. Holds the node whose picker is open or
     // whose upload is running, so a second pick cannot overlap it. Scoped per
     // node rather than editor-wide so a stalled upload on one node cannot stop
-    // every other fileinput node from working.
-    const globalPicksInFlight = {}
+    // every other fileinput node from working. See globalPending on the prototype.
+    const globalPicksInFlight = Object.create(null)
     // Upper bound on a single upload. The browser puts no timeout on fetch, so
     // without this a request that never settles would hold its node's guard for
     // the life of the editor session. Generous enough not to cut short a large
@@ -407,7 +416,7 @@
                 success: function (data) {
                   return resolve(data)
                 },
-                error: function (jqXHR, textStatue, errorThrown) {
+                error: function (jqXHR, textStatus, errorThrown) {
                   const code = jqXHR.status
                   const key =
                     code === 401
@@ -682,6 +691,19 @@
         return this.name || "file input"
       },
       button: {
+        // Nothing here guards against being pressed on a node inside a subflow
+        // TEMPLATE, where `this.id` names a node the runtime never instantiates -
+        // an instance is given a generated id and the template id resolves to no
+        // runtime node at all, so an upload started from there could only 404.
+        // The editor core refuses the action before it reaches this handler:
+        // both the button's enabled state and its click handler gate on
+        // RED.nodes.workspace(RED.workspaces.active()), and a subflow is held in
+        // a separate registry from the flow tabs, so that lookup misses. The
+        // button is drawn greyed out and a click answers "node actions disabled
+        // within subflow" without calling in here. Verified against the editor
+        // version this package is developed against (2.2.x); the gate itself long
+        // predates the oldest runtime the package supports.
+        //
         // Not async, and openFilePicker() is called directly: this handler runs
         // inside the user's click, and that is the only moment the browser will
         // open a file picker.

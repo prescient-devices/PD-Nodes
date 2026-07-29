@@ -49,6 +49,17 @@ Then to run the tests:
     $ npm test
     [...]
 
+The test-bench starts a Node-RED runtime of its own and drives its editor in a
+browser. That runtime listens on port **18880** rather than Node-RED's usual
+1880, so a development instance already parked on 1880 does not have to be taken
+down for the length of a run. Should 18880 be busy as well, the whole suite -
+both the runtime it starts and the browser it drives against that runtime - moves
+with the `__FILEINPUT_TEST_UI_PORT__` environment variable:
+
+    $ cd "${HOME}"/node-red-contrib-fileinput
+    $ __FILEINPUT_TEST_UI_PORT__=18881 npm test
+    [...]
+
 ### Contributing / Fixes
 
 An issue may be raised for typos and single-line fixes. A pull request may be

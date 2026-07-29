@@ -21,12 +21,24 @@ module.exports = function (RED) {
   function errorMsg(arg1, arg2) {
     return globalIsInTest ? arg1 : RED._(arg1, arg2)
   }
-  let globalHash = {}
+  // Object.create(null) here and for the three maps below it. All four are keyed
+  // by ids that reach the runtime from the browser, and on a plain object
+  // "__proto__" is not a key at all: writing it runs the inherited accessor and
+  // moves the map's prototype, and reading it hands back Object.prototype, which
+  // every truthiness guard in this file would take for a live entry. No pollution
+  // is reachable today - a node id has to resolve to a deployed fileinput node
+  // before it is used as a key, and the one wire-supplied key that is not an id
+  // (a message's streamId, read by the backpressure node) survives only because
+  // comparing a number against the undefined it finds on Object.prototype happens
+  // to be false - which is far too thin a reason for it to hold. Nothing reads
+  // these maps by a dotted property name or calls hasOwnProperty() on them, so
+  // having no prototype costs them nothing.
+  let globalHash = Object.create(null)
   // node id -> true while a wire message is waiting for the editor user to
   // choose a file. The cancel route reads it so a cancel can only ever clear a
   // request that is genuinely armed, rather than let any editor session wipe the
   // primed message of a node that was never prompted.
-  let globalArmed = {}
+  let globalArmed = Object.create(null)
   // How long an armed request lives with the editor not acting on it. The editor
   // holds the other half of this handshake and it can simply vanish: the tab is
   // closed or reloaded while the request is parked, and nothing would ever
@@ -42,19 +54,23 @@ module.exports = function (RED) {
   // intermediary that buffers the request body before forwarding it - nginx does
   // by default - can leave a genuine upload without a dataOwner for minutes, and
   // discarding a live claim would let two bodies cross into one stream. Erring
-  // long only delays the reaping of an abandoned handshake.
-  const globalClaimTtlMs = 5 * 60 * 1000
+  // long only delays the reaping of an abandoned handshake. Overridable in test
+  // only, alongside the other __FILEINPUT_TEST_* knobs: what the reap itself does
+  // is worth asserting, and five minutes is not a wait a test can sit through.
+  const globalClaimTtlMs =
+    (globalIsInTest && Number(process.env["__FILEINPUT_TEST_CLAIM_TTL_MS__"])) ||
+    5 * 60 * 1000
   let globalStreamSeq = 0
   // streamId -> { resume }. A streaming upload with backpressure enabled parks
   // its resume handle here so a downstream fileinput-backpressure node can
   // release the next chunk once the current one has been consumed.
-  let globalStreamControls = {}
+  let globalStreamControls = Object.create(null)
   // streamId -> { committedIndex }. How many fixed-size blocks the receiver has
   // durably acknowledged, tracked by the fileinput-backpressure node from each
   // ack. A replayed/retried upload (see the data-path notes below) reuses this to
   // fast-forward past the blocks already delivered and resume from committedIndex,
   // instead of re-sending the whole file and crossing streams.
-  let globalStreamProgress = {}
+  let globalStreamProgress = Object.create(null)
   // Fixed streaming block size. Framing the upload into fixed-size blocks makes
   // block N always the same bytes ([N*FIXED, (N+1)*FIXED)) regardless of how the
   // HTTP body is split across `data` events, so a replay can resume by block index.
@@ -62,6 +78,47 @@ module.exports = function (RED) {
   // How long an upload waits for a chunk acknowledgement before it gives up
   // (e.g. the fileinput-backpressure node is missing or its consumer stalled).
   const globalBpTimeoutMs = 30 * 1000
+  // Bound on a caller-supplied value written into a log line.
+  const globalLogValueMaxLen = 120
+  // Everything a caller controls goes through here before it reaches a log line.
+  // A request header is whatever the caller chose to put in it, and both readers
+  // of the runtime log act on control characters: a terminal treats several of
+  // them as a line break or as the start of an escape sequence, so a caller could
+  // forge log entries around the warning it triggered, and an unbounded header
+  // would be copied into the line whole. This is the same refusal to echo caller
+  // input verbatim that keeps the abort route from naming the streamId it was
+  // handed; there the value is simply left out, here the line says nothing
+  // without it. req.params.id is deliberately not run through this: it reaches a
+  // log line only once it has resolved to a deployed fileinput node, which no
+  // string of the caller's choosing does.
+  function safeLogValue(arg) {
+    const raw = String(arg === null || arg === undefined ? "" : arg)
+    // The whole of C0 including tab, plus DEL and the C1 range. A value carrying
+    // any of them has nothing to say that their removal loses. Matched by code
+    // point rather than written as a literal character class, as safeLabel() in
+    // the editor script is for the same reason: these characters are invisible in
+    // a source file. Iterating by code point also keeps the truncation below from
+    // halving a surrogate pair and emitting a lone surrogate into the log.
+    const chars = []
+    for (const ch of raw) {
+      const code = ch.codePointAt(0)
+      if (code < 0x20 || (code >= 0x7f && code <= 0x9f)) {
+        continue
+      }
+      chars.push(ch)
+    }
+    const text =
+      chars.length > globalLogValueMaxLen
+        ? `${chars.slice(0, globalLogValueMaxLen).join("")}...`
+        : chars.join("")
+    if (!text) {
+      // Nothing was sent, or nothing survived. "?" is what these lines already
+      // show for a value that is not available, where an empty interpolation
+      // reads as a field the log itself failed to fill in.
+      return "?"
+    }
+    return text
+  }
   // The single reader of globalHash for every guard that asks "is an upload
   // actually running on this node". A claim is created by the metadata POST and
   // adopted by the data POST that follows; between the two it has no dataOwner
@@ -84,6 +141,21 @@ module.exports = function (RED) {
     globalHash[id] = null
     if (claim.streamId) {
       delete globalStreamProgress[claim.streamId]
+    }
+    // The node is still showing whatever the claim just reaped last put there -
+    // the progress badge its metadata POST raised, or the waiting badge of the
+    // request that armed it - and nothing else would take that down until the arm
+    // timer fires, up to ten minutes later. Nothing is in flight on this node any
+    // more, so show nothing. Only the badge is touched: the editor's notification
+    // for the same request may still be on screen, and an upload the user starts
+    // from it must still carry the properties of the wire message that armed it,
+    // which reporting an error here would drop. Reaping is lazy - it happens on
+    // the next read of the claim rather than on a timer - so this lands exactly
+    // when something asks about the claim, which is when the stale badge is about
+    // to be contradicted anyway.
+    const node = RED.nodes.getNode(id)
+    if (node) {
+      node.status({})
     }
     return null
   }
@@ -320,6 +392,13 @@ module.exports = function (RED) {
           // No downstream node acknowledged the last chunk; abort so the request
           // and node status do not hang indefinitely.
           delete globalStreamControls[streamId]
+          // The committed-index progress goes with it, the same narrowing of
+          // adopt-and-resume that releaseClaimOnAbort() makes and for the same
+          // reason: this path reports the upload failed, which clears the primed
+          // wire message, so blocks sent before the timeout carried its properties
+          // and blocks a resume sent afterwards would not. Left behind, the entry
+          // is unreachable - a streamId is issued once - and never reclaimed.
+          delete globalStreamProgress[streamId]
           procError(
             new Error("Backpressure acknowledgement timeout"),
             "Backpressure timeout"
@@ -416,11 +495,13 @@ module.exports = function (RED) {
           const reqNonce = `${Date.now().toString(36)}${(globalStreamSeq++).toString(
             36
           )}`
-          const reqSrc =
-            req.headers["x-forwarded-for"] ||
-            (req.socket && req.socket.remoteAddress) ||
-            "?"
-          const reqLen = req.headers["content-length"] || "?"
+          // Both are headers, so both are the caller's own text and neither may
+          // reach the log lines below as it arrived; see safeLogValue(), which
+          // also supplies the "?" these two used to default to.
+          const reqSrc = safeLogValue(
+            req.headers["x-forwarded-for"] || (req.socket && req.socket.remoteAddress)
+          )
+          const reqLen = safeLogValue(req.headers["content-length"])
           const claim = globalHash[req.params.id]
           if (!claim) {
             // data body with no active manifest (orphaned or replayed after the
@@ -916,7 +997,13 @@ module.exports = function (RED) {
           outMsg[prop] = payload.toString()
         }
       } catch (error) {
-        console.log(error)
+        // The sanitised message rather than the error itself: V8 quotes a slice of
+        // the input it choked on into a JSON parse message, so the uploaded file's
+        // own bytes reach this log line - control characters and all - and that is
+        // the same forging vector the request headers were sanitised for. Dropping
+        // the stack with it loses nothing: the only statements this catch covers
+        // are the three conversions above.
+        console.log(safeLogValue(error && error.message ? error.message : error))
         return node.error(errorMsg("fileinput.errors.conversion"))
       }
       node.send(outMsg)

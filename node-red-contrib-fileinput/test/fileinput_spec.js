@@ -9,6 +9,7 @@
 // NodeJS imports
 const fs = require("fs")
 const http = require("http")
+const net = require("net")
 const path = require("path")
 // npm imports
 const clone = require("clone")
@@ -68,6 +69,22 @@ const globalReportFunc = [
   ")",
   "return msg",
 ].join("\n")
+// Reports an acknowledgement that crossed the fileinput-backpressure node. Only
+// that it arrived matters: whether the node polluted Object.prototype on the way
+// cannot be asked from here, because a function node runs in a vm context of its
+// own and so has its own intrinsics, which the runtime's are not.
+const globalProbeFunc = [
+  "node.warn(JSON.stringify({ payload: msg.payload }))",
+  "return msg",
+].join("\n")
+// Reports the status badge of whichever node a status node is scoped to. The
+// badge reaches no message and is not logged, so this is the only way a test can
+// read one back. An empty text stands for a cleared badge, which arrives as a
+// status message with no text at all.
+const globalStatusFunc = [
+  'node.warn(JSON.stringify({ text: msg.status.text || "" }))',
+  "return null",
+].join("\n")
 
 // Functions
 function _capitalize(arg) {
@@ -78,6 +95,13 @@ function getFlow(config) {
   config = config || {}
   if (config.backpressure) {
     return getBackpressureFlow(config)
+  }
+  if (config.probe) {
+    // No options: the fixture exists to name one key, and that key is the point.
+    return getPrototypeProbeFlow()
+  }
+  if (config.status) {
+    return getStatusFlow(config)
   }
   if (config.subflow) {
     return getSubflowFlow(config)
@@ -228,6 +252,136 @@ function getInjectNode(z, wires) {
     y: 80,
     wires: [wires],
   }
+}
+
+// Flow that hands the backpressure node an acknowledgement naming "__proto__" as
+// its stream:
+//   inject -> fileinput-backpressure -> report
+// A streamId is the one key of the shared stream maps that reaches them from a
+// message rather than from a node id, so it is the only one a flow can choose
+// freely - and on a plain object "__proto__" is not a key at all: the map's own
+// prototype answers for it. The backpressure node then reads that as a live
+// resume handle and calls resume() on it, which throws, and the acknowledgement
+// never reaches the node downstream. The report node speaking at all is what says
+// the maps carry no prototype for the lookup to find.
+function getPrototypeProbeFlow() {
+  const bpId = "bp00000000000001"
+  return [
+    {
+      id: globalTabId,
+      type: "tab",
+      label: "Test flow",
+      disabled: false,
+      info: "",
+      env: [],
+    },
+    {
+      id: globalInjectId,
+      type: "inject",
+      z: globalTabId,
+      name: "Trigger",
+      // Shaped as a durable-commit acknowledgement - ok, with a numeric ackSeq -
+      // so the write path that records a committed index against the stream is
+      // entered as well as the read path that looks for the resume handle. On a
+      // plain object that write lands on Object.prototype itself.
+      props: [
+        { p: "payload" },
+        { p: "streamId", v: "__proto__", vt: "str" },
+        { p: "end", v: "true", vt: "bool" },
+      ],
+      repeat: "",
+      crontab: "",
+      once: false,
+      onceDelay: 0.1,
+      topic: "",
+      payload: JSON.stringify({ ok: true, ackSeq: 1 }),
+      payloadType: "json",
+      x: 130,
+      y: 80,
+      wires: [[bpId]],
+    },
+    {
+      id: bpId,
+      type: "fileinput-backpressure",
+      z: globalTabId,
+      name: "Ack",
+      x: 300,
+      y: 80,
+      wires: [[globalFunctionId]],
+    },
+    {
+      id: globalFunctionId,
+      type: "function",
+      z: globalTabId,
+      name: "Process",
+      func: globalProbeFunc,
+      outputs: 1,
+      noerr: 0,
+      initialize: "",
+      finalize: "",
+      libs: [],
+      x: 460,
+      y: 80,
+      wires: [[]],
+    },
+  ]
+}
+
+// Flow that reads back the fileinput node's own status badge:
+//   fileinput            (nothing wired to it; its badge comes from the routes)
+//   status -> report
+// The status node is scoped to the fileinput node alone, so the badges reported
+// are that node's and in the order it set them.
+function getStatusFlow(config) {
+  const statusId = "st00000000000001"
+  return [
+    {
+      id: globalTabId,
+      type: "tab",
+      label: "Test flow",
+      disabled: false,
+      info: "",
+      env: [],
+    },
+    {
+      id: globalFileInputId,
+      type: "fileinput",
+      z: globalTabId,
+      name: "Load file",
+      datatype: config.datatype || "str",
+      stream: config.stream || "no",
+      property: config.property || "payload",
+      propertyType: "msg",
+      x: 130,
+      y: 80,
+      wires: [[]],
+    },
+    {
+      id: statusId,
+      type: "status",
+      z: globalTabId,
+      name: "Badge",
+      scope: [globalFileInputId],
+      x: 130,
+      y: 160,
+      wires: [[globalFunctionId]],
+    },
+    {
+      id: globalFunctionId,
+      type: "function",
+      z: globalTabId,
+      name: "Process",
+      func: globalStatusFunc,
+      outputs: 1,
+      noerr: 0,
+      initialize: "",
+      finalize: "",
+      libs: [],
+      x: 300,
+      y: 160,
+      wires: [[]],
+    },
+  ]
 }
 
 function getReportNode(z, wires) {
@@ -434,6 +588,24 @@ function getReportedMessages(stdout) {
     )
 }
 
+// Every line the fileinput node logged as a warning, in order, with the
+// per-request nonce masked: it is built from a clock and a counter, so only its
+// presence is predictable. Unlike getNodeMessages() this keeps all of them, since
+// what a warning does NOT contain is the whole assertion in one case below.
+function getWarnedMessages(stdout) {
+  const sentinel = "[fileinput:Load file]"
+  return stdout
+    .split("\n")
+    .filter((item) => item.includes("[warn]") && item.includes(sentinel))
+    .map((item) =>
+      item
+        .split("[warn]")[1]
+        .slice(sentinel.length + 1)
+        .trim()
+        .replace(/req [0-9a-z]+/, `req ${globalStreamIdMask}`)
+    )
+}
+
 // The notification's buttons are built from literal catalogue strings, which in
 // test mode are the raw keys, so a button is located by the key it renders.
 async function getNotificationButton(page, key) {
@@ -495,6 +667,55 @@ function httpPost(urlPath, options) {
       req.write(options.body)
     }
     req.end()
+  })
+}
+
+// A data POST whose headers go onto the wire exactly as given, byte for byte.
+// httpPost() cannot do this: Node's HTTP client re-encodes a header value, so a
+// C1 control written into one arrives at the server as two characters, and it
+// refuses several controls outright rather than send them - while a proxy, or
+// anything else speaking HTTP directly, puts whatever bytes it likes into
+// x-forwarded-for. Which controls matter is decided by Node's SERVER: it answers
+// 400 for the C0 controls and for DEL, so the C1 range is what actually reaches a
+// route, and U+0085 in it is NEL - a line break to a terminal reading the runtime
+// log, and so the forging that the sanitising of these values prevents.
+//
+// Connection: close, so the server hangs up once it has answered and the response
+// can be read to its end without parsing a length or a chunked body.
+function httpPostRaw(urlPath, headerName, headerBytes, body) {
+  return new Promise(function (resolve, reject) {
+    const socket = net.connect(globalUiPort, "127.0.0.1", function () {
+      socket.write(
+        Buffer.concat([
+          Buffer.from(
+            `POST ${urlPath} HTTP/1.1\r\n` +
+              `Host: 127.0.0.1:${globalUiPort}\r\n` +
+              `Connection: close\r\n` +
+              `Content-Type: application/octet-stream\r\n` +
+              `Content-Length: ${Buffer.byteLength(body, "latin1")}\r\n` +
+              `${headerName}: `,
+            "latin1"
+          ),
+          // latin1 throughout: one character in, one byte out, which is the point
+          // of using a socket here at all.
+          Buffer.from(headerBytes, "latin1"),
+          Buffer.from(`\r\n\r\n${body}`, "latin1"),
+        ])
+      )
+    })
+    let raw = ""
+    socket.on("data", (data) => (raw += data.toString()))
+    socket.on("error", reject)
+    socket.on("end", function () {
+      const status = Number((raw.split("\r\n")[0] || "").split(" ")[1])
+      const separator = raw.indexOf("\r\n\r\n")
+      const answered = separator === -1 ? "" : raw.slice(separator + 4)
+      let parsed = answered
+      try {
+        parsed = JSON.parse(answered)
+      } catch (_) {}
+      return resolve({ status, body: parsed })
+    })
   })
 }
 
@@ -1289,6 +1510,112 @@ describe("node-red-contrib-fileinput", function () {
         data: { status: 404, body: "Not Found" },
         injected: false,
         saved: false,
+      })
+    })
+  })
+  // The warnings the upload route logs name the request they are about, and part
+  // of what identifies a request is a header - which is the caller's own text.
+  // Written into the log as it arrived, a control character in one re-writes the
+  // line it lands in, so a caller could forge entries around the very warning it
+  // triggered, and a header of any length would be copied in whole.
+  describe("Log lines built from request headers", function () {
+    // A C1 control, the only kind Node's HTTP server carries through to a route;
+    // U+0085 is NEL, which a terminal reading the log treats as a line break.
+    const forgedControl = String.fromCharCode(0x85)
+    it("Should strip a control character and bound the length of a logged header", async function () {
+      await startNodeRed({})
+      // A data POST with nothing claimed takes the "no active stream" path, the
+      // shortest way to a log line built out of the request's own headers.
+      const posted = await httpPostRaw(
+        `/node-red-contrib-fileinput/file/${globalFileInputId}`,
+        "X-Forwarded-For",
+        `1.2.3.4${forgedControl}${"x".repeat(200)}`,
+        "data"
+      )
+      await delay(1000)
+      const act = { posted, warned: getWarnedMessages(stdout) }
+      // The address is reported without the control character and cut to 120
+      // characters, and the text on either side of the control is kept: the line
+      // still says what it is about, and the part of it a caller chose can no
+      // longer decide where the line ends or how long it is.
+      const expected = `1.2.3.4${"x".repeat(113)}...`
+      act.should.eql({
+        posted: { status: 409, body: { error: "no active stream" } },
+        warned: [
+          `fileinput: data POST for node ${globalFileInputId} with no active ` +
+            `stream (req ${globalStreamIdMask}, src ${expected}, len 4); ignoring`,
+        ],
+      })
+    })
+  })
+  // The maps the routes keep their per-node and per-stream state in are keyed by
+  // ids that reach the runtime from the browser. A node id has to resolve to a
+  // deployed fileinput node before it is used as one, but a streamId does not: the
+  // backpressure node takes it straight off a message, so a flow can name any key
+  // it likes - including "__proto__", which on a plain object is not a key at all.
+  describe("Prototype safety of the shared stream maps", function () {
+    it("Should ignore an acknowledgement naming __proto__ as its stream", async function () {
+      await startNodeRed({ probe: true })
+      const injected = await httpPost(`/inject/${globalInjectId}`)
+      await delay(2 * 1000)
+      const act = { injected, reported: getReportedMessages(stdout) }
+      // The acknowledgement is passed through untouched, which is what an
+      // acknowledgement for a stream that does not exist should be. Against a
+      // plain object the lookup answers with the map's prototype instead, the node
+      // calls resume() on it, and the message dies there with a TypeError rather
+      // than reaching the node downstream.
+      act.should.eql({
+        injected: { status: 200, body: "OK" },
+        reported: [{ payload: { ok: true, ackSeq: 1 } }],
+      })
+    })
+  })
+  // A claim with no data request behind it is reaped once it is older than the
+  // claim TTL, and the node it was made against is left showing whatever that
+  // claim last put on it - a progress badge for a file that is not coming.
+  describe("Status of a reaped claim", function () {
+    // The reap is what is being observed, so the TTL is cut to a second; see
+    // globalClaimTtlMs in the node.
+    const env = {
+      __FILEINPUT_TEST__: "1",
+      __FILEINPUT_TEST_CLAIM_TTL_MS__: "1000",
+    }
+    it("Should clear the badge of a claim reaped for having no upload behind it", async function () {
+      await startNodeRed({ status: true }, env)
+      const claimed = maskStreamId(
+        await httpPost(`/node-red-contrib-fileinput/file/${globalFileInputId}`, {
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: "data.txt",
+            size: globalWireFileData.length,
+          }),
+        }),
+        globalFileInputId
+      )
+      // Past the TTL, so the claim is now abandoned rather than in progress.
+      await delay(2 * 1000)
+      // Reaping is lazy - it happens on the next read of the claim, not on a
+      // timer - and an abort is the cheapest way to ask for one. It finds nothing
+      // left to release and says so plainly.
+      const aborted = await httpPost(
+        `/node-red-contrib-fileinput/abort/${globalFileInputId}`
+      )
+      await delay(1000)
+      const act = {
+        claimed,
+        aborted,
+        badges: getReportedMessages(stdout).map((item) => item.text),
+      }
+      // The third badge is the one under test: without it the node goes on
+      // showing progress for an upload that was abandoned, until the arm timer
+      // clears it as much as ten minutes later.
+      act.should.eql({
+        claimed: {
+          status: 200,
+          body: { streamId: `${globalFileInputId}-${globalStreamIdMask}` },
+        },
+        aborted: { status: 200, body: "OK" },
+        badges: ["", "File: data.txt (0%)", ""],
       })
     })
   })
