@@ -13,13 +13,21 @@
     },
     "notification": {
       "authorization": "Not authorized to use node",
-      "success": "File __filename__ input successful",
-      "failure": "File __filename__ input failed"
+      "busy": "Another file upload is in progress; try again once it completes",
+      "cancel_busy": "The file request was not cancelled: an upload is already running on that node",
+      "cancel_failed": "Could not cancel the file request",
+      "choose": "Choose file",
+      "dismiss": "Dismiss",
+      "failure": "File __filename__ input failed",
+      "request": "A file input node in a flow is asking for a file: \"__node__\"",
+      "request_flow": "A file input node is asking for a file: \"__node__\" in flow \"__flow__\"",
+      "success": "File __filename__ input successful"
     },
     "status": {
       "error": "Error receiving file __filename__",
       "progress": "File: __filename__ (__per__%)",
-      "success": "File __filename__ received"
+      "success": "File __filename__ received",
+      "waiting": "Waiting for file selection"
     },
     "stream_options": {
       "no": "No",

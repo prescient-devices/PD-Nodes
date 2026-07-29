@@ -43,101 +43,626 @@
 
 <script type="text/javascript">
   ; (function () {
-    let globalId = null
-    let globalFileInFlight = false
-    const globalIsInTest = window.navigator.userAgent === "__pdi-test-puppeteer__"
-    // Shared by the toolbar button and by wire-triggered messages: prompt the
-    // user for a file and upload it to the given runtime node.
-    async function openFilePicker(node, realId) {
-      globalId = realId || node.id
-      const notifyMsg = (arg, dict) => globalIsInTest ? arg : node._(arg, dict)
-      async function readFile() {
-        let that = this
-        if (!that.files.length) {
-          return
-        }
-        let fileBlob = that.files[0]
-        if (!fileBlob) {
-          return
-        }
-        const filename = fileBlob.name
-        const size = fileBlob.size
-        const fileData = { filename, size }
-        try {
-          await new Promise(function (resolve, reject) {
-            $.ajax({
-              type: "POST",
-              url: `node-red-contrib-fileinput/file/${globalId}`,
-              headers: {
-                Accept: "application/json",
-                "Content-type": "application/json",
-              },
-              data: JSON.stringify(fileData),
-              datatype: "json",
-              success: function () {
-                return resolve()
-              },
-              error: function (jqXHR, textStatue, errorThrown) {
-                const code = jqXHR.status
-                const msg = notifyMsg(code === 401 ? "fileinput.notification.authorization" : "fileinput.notification.failure")
-                globalIsInTest && console.log(`fileinput: ${msg} (${jqXHR.status})`)
-                RED.notify(msg, "error")
-                return reject()
-              },
-            })
-          })
-        } catch (_) {
-          return
-        }
-        const request = new Request(
-          `node-red-contrib-fileinput/file/${globalId}`,
-          {
-            method: "POST",
-            body: fileBlob,
-            headers: {
-              "Content-Type": "application/octet-stream"
-            }
-          }
-        )
-        try {
-          let response = await fetch(request)
-          if (typeof response === "object" && response.ok) {
-            const msg = notifyMsg("fileinput.notification.success", { filename })
-            globalIsInTest && console.log(`fileinput: ${msg}`)
-            return RED.notify(msg, { type: "success", id: "fileinput", timeout: 2000 })
-          }
-        } catch (error) { }
-        const msg = notifyMsg("fileinput.notification.failure", { filename })
-        globalIsInTest && console.log(`fileinput: ${msg}`)
-        RED.notify(msg, "error")
+    // Bound on the small control calls around an upload - the metadata POST and
+    // the dismissal POST. Neither carries a file, so neither has any business
+    // taking long, and letting them hang would hold the node's pick guard.
+    const globalControlTimeoutMs = 30 * 1000
+    const globalIsInTest = window.navigator.userAgent === "__fileinput-test-puppeteer__"
+    // Longest node name or file name shown in a notification. The arming event
+    // is broadcast to every open editor session, so one flow author's node name
+    // must not be able to fill another user's notification pane.
+    const globalLabelMaxLen = 64
+    // Runtime node id -> { node, realId, notification }. A message on a node's
+    // input port ARMS a file request here instead of opening the picker; see the
+    // comms subscription below for why it cannot open it directly. The key is
+    // the RUNTIME id, not the editor id: every instance of a subflow publishes
+    // its arming event on the shared template id, so keying on the editor id
+    // made a second instance silently overwrite the first one's target and the
+    // file went to whichever instance armed last.
+    const globalPending = {}
+    // How long to wait after the browser window regains focus before deciding
+    // that the picker was dismissed without a file being chosen. The `change`
+    // event is not guaranteed to arrive before the focus event, so it is given
+    // a moment to land first.
+    const globalPickerGraceMs = 1000
+    // Last-resort release for a pick that produced no `change` and no `cancel`,
+    // for instance because the picker never opened at all.
+    const globalPickerStaleMs = 10 * 60 * 1000
+    // Runtime node id -> pick token. Holds the node whose picker is open or
+    // whose upload is running, so a second pick cannot overlap it. Scoped per
+    // node rather than editor-wide so a stalled upload on one node cannot stop
+    // every other fileinput node from working.
+    const globalPicksInFlight = {}
+    // Upper bound on a single upload. The browser puts no timeout on fetch, so
+    // without this a request that never settles would hold its node's guard for
+    // the life of the editor session. Generous enough not to cut short a large
+    // file on a slow link.
+    const globalUploadTimeoutMs = 30 * 60 * 1000
+    // Every call this node makes to its own admin routes is built here, and only
+    // here. The editor attaches admin-API credentials to jQuery requests ONLY,
+    // from a global $.ajaxSetup prefilter in the editor client. An upload is two
+    // requests to the SAME route - the metadata POST, which is jQuery and so
+    // picked those credentials up, and the data POST carrying the file, which
+    // was a raw fetch and never did. With adminAuth enabled the second one was
+    // refused before the runtime handler ran, so no upload could complete and
+    // the claim the metadata POST had just created was left with nothing to
+    // release it. Two ways of addressing one route is what let them drift apart,
+    // hence one place that turns a route path into what to send it with.
+    //
+    // Mirrors the prefilter's contract on a relative admin path: the same
+    // "auth-tokens" key, the same plain concatenation of the API root, the same
+    // version header. That prefilter only acts on urls that still look relative,
+    // so once the API root is prefixed here it attaches nothing at all - which is
+    // why the headers are returned for the jQuery call sites too rather than left
+    // to it. With no API root configured both run and set the same values, which
+    // is harmless.
+    function adminRequest(path) {
+      const settings = (typeof RED === "object" && RED && RED.settings) || null
+      // The admin API is served under this prefix wherever the deployment
+      // configures one; a request that skips it never reaches the runtime.
+      const root = (settings && settings.apiRootUrl) || ""
+      const headers = { "Node-RED-API-Version": "v2" }
+      let tokens = null
+      try {
+        // get() reads localStorage, which a browser can refuse outright. A
+        // request that goes without the header fails and says so; an exception
+        // thrown out of here would instead leave the user with a picker that
+        // did nothing at all.
+        tokens = settings && settings.get ? settings.get("auth-tokens") : null
+      } catch (_) {}
+      if (tokens && tokens.access_token) {
+        // Only when there is a token to send: with adminAuth off the editor
+        // holds none, and "Bearer undefined" is not the same thing as no header.
+        headers.Authorization = `Bearer ${tokens.access_token}`
       }
-      if (globalFileInFlight) {
+      return { url: root + path, headers }
+    }
+    // Open the picker for a request that a wire message parked. This is invoked
+    // straight from the notification button's click handler, and the chain from
+    // that handler down to obj.click() inside openFilePicker() is deliberately a
+    // plain synchronous call chain: an await, a promise callback or a timer
+    // anywhere along it ends the user activation and the browser blocks the
+    // picker, which is exactly the failure the arming step exists to avoid.
+    function acceptPending(realId) {
+      const pending = globalPending[realId]
+      if (!pending) {
         return
       }
-      globalFileInFlight = true
-      let obj
+      if (!openFilePicker(pending.node, realId)) {
+        // This node's previous pick is still uploading. Leave the request armed
+        // so the user can accept it again once that upload settles.
+        const msg = notifyMsg(pending.node, "fileinput.notification.busy")
+        globalIsInTest && console.log(`fileinput: ${msg}`)
+        RED.notify(notifyText(msg), "warning")
+      }
+      // The notification is deliberately left standing until a file is actually
+      // chosen (readFile() takes it down). Closing it here instead would strand
+      // the node: the user who presses Escape in the picker would be left with a
+      // runtime node still waiting for a file and nothing on screen to click.
+    }
+    // Arm a file request raised by a wire message and put something on screen
+    // for the user to click, since only a real click can open the picker.
+    function armFilePicker(node, realId) {
+      if (globalPending[realId]) {
+        // The same runtime node armed again while its request is still parked.
+        // One notification per parked request is the right granularity, so this
+        // is genuinely idempotent rather than a retarget.
+        return
+      }
+      const label = safeLabel(RED.utils.getNodeLabel(node, node.type))
+      // Name the containing tab or subflow when it can be resolved. The prompt
+      // reaches every open editor session, so without it the user is asked to
+      // hand a local file to a flow the prompt does not identify.
+      const container = RED.nodes.workspace(node.z) || RED.nodes.subflow(node.z)
+      const flow = container ? safeLabel(container.label || container.name) : ""
+      const text = notifyMsg(
+        node,
+        flow ? "fileinput.notification.request_flow" : "fileinput.notification.request",
+        { node: label, flow }
+      )
+      globalIsInTest && console.log(`fileinput: ${text}`)
+      const entry = { node, realId, notification: null }
+      globalPending[realId] = entry
+      entry.notification = RED.notify(notifyText(text), {
+        fixed: true,
+        buttons: [
+          {
+            // Button labels reach innerHTML too (see notifyText); only literal
+            // catalogue strings may ever be used here.
+            text: notifyMsg(node, "fileinput.notification.choose"),
+            class: "primary",
+            click: function () {
+              acceptPending(realId)
+            },
+          },
+          {
+            text: notifyMsg(node, "fileinput.notification.dismiss"),
+            click: function () {
+              clearPending(realId, true)
+            },
+          },
+        ],
+      })
+    }
+    // Drop a parked request and take down its notification. When `cancel` is set
+    // the runtime is told the user walked away, so the node's status does not sit
+    // on "waiting for a file" for the rest of the session.
+    function clearPending(realId, cancel) {
+      const pending = globalPending[realId]
+      if (!pending) {
+        return
+      }
+      delete globalPending[realId]
+      if (pending.notification) {
+        pending.notification.close()
+      }
+      if (!cancel) {
+        return
+      }
+      const request = adminRequest(
+        `node-red-contrib-fileinput/cancel/${encodeURIComponent(realId)}`
+      )
+      $.ajax({
+        type: "POST",
+        url: request.url,
+        headers: Object.assign({ Accept: "application/json" }, request.headers),
+        timeout: globalControlTimeoutMs,
+        error: function (jqXHR) {
+          const code = (jqXHR.responseJSON || {}).code
+          if (jqXHR.status === 409 && code === "upload_in_progress") {
+            // The runtime is mid-upload on this node and will not cut into it.
+            // Say so: the notification has just closed under the user's click,
+            // and letting that be the whole answer is what made Dismiss read as
+            // a button that does nothing while it silently changed nothing.
+            const busy = notifyMsg(pending.node, "fileinput.notification.cancel_busy")
+            globalIsInTest && console.log(`fileinput: ${busy}`)
+            RED.notify(notifyText(busy), "warning")
+            return
+          }
+          if (jqXHR.status === 409) {
+            // The runtime is no longer waiting on this request: it was already
+            // answered, or it expired, or it was never armed. There is nothing
+            // to restore and nothing to report - the notification closing is the
+            // whole of what the user asked for. A runtime older than this editor
+            // sends no code at all and lands here, as it always did.
+            return
+          }
+          const msg = notifyMsg(pending.node, "fileinput.notification.cancel_failed")
+          globalIsInTest && console.log(`fileinput: ${msg} (${jqXHR.status})`)
+          RED.notify(notifyText(msg), "error")
+          // The runtime still believes it is waiting for a file, so put the
+          // request back rather than strand the node with nothing to click.
+          armFilePicker(pending.node, realId)
+        },
+      })
+    }
+    // Node-RED resolves a node's own message catalogue through node._(). The
+    // test harness loads no catalogue, so there it asserts on the raw keys.
+    function notifyMsg(node, arg, dict) {
+      return globalIsInTest ? arg : node._(arg, dict)
+    }
+    // RED.notify() assigns a string argument straight to innerHTML, and the
+    // editor's i18next runs with escapeInterpolation off, so a node name or a
+    // file name substituted into a catalogue string arrives raw and would
+    // execute in the editor origin. Handing it a text node instead takes
+    // RED.notify()'s append branch, which cannot inject markup. The same applies
+    // to a button's `text`, which reaches innerHTML on the create path and
+    // therefore must only ever be given a literal catalogue string.
+    function notifyText(msg) {
+      return $("<p>").text(msg)
+    }
+    // Shared by the toolbar button and by the notification button raised for a
+    // wire message: prompt the user for a file and upload it to the given
+    // runtime node. Everything between the caller's click and obj.click() below
+    // runs in one synchronous turn on purpose, because the browser only opens a
+    // file picker while the user activation from that click is still live.
+    // Returns true when the picker was opened.
+    function openFilePicker(node, realId) {
+      const targetId = realId || node.id
+      if (globalPicksInFlight[targetId]) {
+        // This node's previous pick is still uploading. Overlapping picks would
+        // race for the runtime's per-node upload slot, which rejects the second.
+        return false
+      }
+      // Identity for this invocation, so a stale invocation can only ever
+      // release the guard it actually holds.
+      const pickToken = {}
+      const uploadAbort = new AbortController()
+      let obj = null
+      let chosen = false
+      let guardReleased = false
+      let tornDown = false
+      let graceTimer = null
+      let staleTimer = null
+      let uploadTimer = null
+      // Frees this node's pick guard and nothing else. The fallback paths below
+      // use it and deliberately leave the `change` listener attached: the window
+      // can regain focus while the picker is still open (switching apps does
+      // it), and tearing down there would silently swallow the file the user
+      // goes on to choose.
+      function releaseGuard() {
+        if (guardReleased) {
+          return
+        }
+        guardReleased = true
+        window.clearTimeout(staleTimer)
+        if (globalPicksInFlight[targetId] === pickToken) {
+          delete globalPicksInFlight[targetId]
+        }
+      }
+      // Frees the guard and drops the element. Only the paths that know the
+      // outcome may do this: a file was read, or the picker itself reported
+      // `cancel`. The element is never inserted into the document, so the
+      // previous obj.remove() call did nothing at all; releasing the listeners
+      // and the reference is what actually lets it be collected.
+      function teardown() {
+        releaseGuard()
+        if (tornDown) {
+          return
+        }
+        tornDown = true
+        window.clearTimeout(graceTimer)
+        window.clearTimeout(uploadTimer)
+        window.removeEventListener("focus", onPickerClosed)
+        if (obj) {
+          obj.removeEventListener("change", readFile)
+          obj.removeEventListener("cancel", onPickerCancelled)
+          obj = null
+        }
+      }
+      function onPickerCancelled() {
+        // Recent browsers fire `cancel` when the picker closes with no
+        // selection. That outcome is definitive, so the element can go. Any
+        // request parked for this node stays armed and stays clickable.
+        teardown()
+      }
+      function onPickerClosed() {
+        // Browsers without the `cancel` event give no signal when the picker is
+        // dismissed, and the window regaining focus is the only hint available.
+        // It is not a reliable one, so only the guard is freed here.
+        graceTimer = window.setTimeout(function () {
+          if (!chosen) {
+            releaseGuard()
+          }
+        }, globalPickerGraceMs)
+      }
+      // Runs on `change`, that is, once the user has actually chosen a file.
+      async function readFile() {
+        chosen = true
+        let that = this
+        try {
+          // A `change` arriving after one of the fallback paths already freed
+          // the guard has to claim it back, or a second pick could start
+          // alongside this upload. Compare before claiming, exactly as
+          // releaseGuard() compares before freeing: if a newer pick now owns
+          // this node, this `change` belongs to a picker the user abandoned and
+          // then re-opened, and stealing the slot from the live pick would put
+          // two uploads on one node.
+          if (
+            globalPicksInFlight[targetId] &&
+            globalPicksInFlight[targetId] !== pickToken
+          ) {
+            return
+          }
+          globalPicksInFlight[targetId] = pickToken
+          guardReleased = false
+          if (!that.files.length) {
+            return
+          }
+          let fileBlob = that.files[0]
+          if (!fileBlob) {
+            return
+          }
+          // A file is on its way to this node, so whatever request was parked
+          // for it has been answered: take the notification down. A pick started
+          // from the toolbar button reaches here too, which is what clears a
+          // request the user chose to answer that way instead - though only for
+          // a node the toolbar can reach, since a toolbar pick keys on the
+          // editor id and a subflow instance's request is keyed on its runtime
+          // id. A deployed subflow instance exposes no button, so that case does
+          // not arise; the runtime's arm expiry covers it either way.
+          clearPending(targetId, false)
+          const filename = fileBlob.name
+          const label = safeLabel(filename)
+          const size = fileBlob.size
+          const fileData = { filename, size }
+          uploadTimer = window.setTimeout(function () {
+            uploadAbort.abort()
+          }, globalUploadTimeoutMs)
+          // Both halves of the upload address this one path, so it is written
+          // once. adminRequest() is called separately for each of them so the
+          // token is read as late as possible rather than at the top of an
+          // upload that may run for a long time.
+          const uploadPath = `node-red-contrib-fileinput/file/${encodeURIComponent(
+            targetId
+          )}`
+          // The claim the metadata POST is about to create, so that if this
+          // upload has to be reported dead later it can name the claim it means
+          // rather than whatever stands for the node by then. A runtime that
+          // still answers the older bare-status body leaves this unset - which
+          // takes a downgraded runtime under an editor tab that was never
+          // reloaded, since this page is served by the runtime it talks to -
+          // and an unnamed release is what the abort route has always done.
+          // That older body is also why this request is left to jQuery's
+          // content-type guess: the `datatype` key below is not the `dataType`
+          // one jQuery reads, and correcting it would force a parse and turn
+          // that bare "OK" into a failure for an upload that had succeeded.
+          let claimStreamId = null
+          try {
+            const meta = await new Promise(function (resolve, reject) {
+              const metaRequest = adminRequest(uploadPath)
+              $.ajax({
+                type: "POST",
+                url: metaRequest.url,
+                headers: Object.assign(
+                  {
+                    Accept: "application/json",
+                    "Content-type": "application/json",
+                  },
+                  metaRequest.headers
+                ),
+                data: JSON.stringify(fileData),
+                datatype: "json",
+                timeout: globalControlTimeoutMs,
+                success: function (data) {
+                  return resolve(data)
+                },
+                error: function (jqXHR, textStatue, errorThrown) {
+                  const code = jqXHR.status
+                  const key =
+                    code === 401
+                      ? "fileinput.notification.authorization"
+                      : "fileinput.notification.failure"
+                  const msg = notifyMsg(node, key, { filename: label })
+                  globalIsInTest && console.log(`fileinput: ${msg} (${jqXHR.status})`)
+                  RED.notify(notifyText(msg), "error")
+                  return reject()
+                },
+              })
+            })
+            claimStreamId = (meta || {}).streamId
+          } catch (_) {
+            return
+          }
+          try {
+            // Built in here rather than above the try: a throw out of either -
+            // a token malformed enough to be refused as a header value - would
+            // otherwise leave readFile() as an unhandled rejection with the
+            // claim the metadata POST just created still standing, the one
+            // remaining shape that leaks a claim for its full lifetime. Not
+            // reachable today, since the same header would have thrown out of
+            // the jQuery call above and returned at the catch, but the release
+            // below should not depend on that staying true.
+            const dataRequest = adminRequest(uploadPath)
+            const request = new Request(dataRequest.url, {
+              method: "POST",
+              body: fileBlob,
+              signal: uploadAbort.signal,
+              // Stated rather than left to fetch's default, which this has
+              // always relied on: a deployment that authenticates the admin API
+              // by session rather than by token is carried entirely by these
+              // cookies, and that must not turn on a default quietly moving.
+              credentials: "same-origin",
+              headers: Object.assign(
+                { "Content-Type": "application/octet-stream" },
+                dataRequest.headers
+              ),
+            })
+            let response = await fetch(request)
+            if (typeof response === "object" && response.ok) {
+              const msg = notifyMsg(node, "fileinput.notification.success", {
+                filename: label,
+              })
+              globalIsInTest && console.log(`fileinput: ${msg}`)
+              return RED.notify(notifyText(msg), {
+                type: "success",
+                id: "fileinput",
+                timeout: 2000,
+              })
+            }
+          } catch (error) {}
+          // The data POST is over and it did not succeed, so the claim the
+          // metadata POST created has to go, and only this side can say so - see
+          // releaseUploadClaim(). Reached from the failure paths alone: a
+          // successful upload returns above, and a metadata POST that itself
+          // failed returns earlier still, without which a 409 there (this node
+          // already has an upload running) would have this release the claim of
+          // the upload it just lost the race to.
+          releaseUploadClaim(targetId, claimStreamId)
+          const msg = notifyMsg(node, "fileinput.notification.failure", {
+            filename: label,
+          })
+          globalIsInTest && console.log(`fileinput: ${msg}`)
+          RED.notify(notifyText(msg), "error")
+        } finally {
+          teardown()
+        }
+      }
+      globalPicksInFlight[targetId] = pickToken
       try {
         obj = document.createElement("input")
         obj.setAttribute("type", "file")
         obj.addEventListener("change", readFile)
+        obj.addEventListener("cancel", onPickerCancelled)
+        window.addEventListener("focus", onPickerClosed, { once: true })
+        staleTimer = window.setTimeout(function () {
+          if (!chosen) {
+            releaseGuard()
+          }
+        }, globalPickerStaleMs)
         obj.click()
-      } catch (_) { }
-      obj && obj.remove()
-      globalFileInFlight = false
-    }
-    // A message on the node's input port raises this runtime event, which
-    // arrives here as a comms notification and opens the file picker just as
-    // if the toolbar button had been clicked.
-    RED.comms.subscribe("notification/#", async function (topic, payload) {
-      const sentinel = "notification/FILE-INPUT-"
-      if (topic.startsWith(sentinel)) {
-        const id = topic.slice(sentinel.length).trim()
-        const { realId } = payload || {}
-        const node = RED.nodes.node(id)
-        if (node) {
-          await openFilePicker(node, realId)
-        }
+      } catch (_) {
+        teardown()
+        return false
       }
+      return true
+    }
+    // Tell the runtime that an upload started here is over and no file is
+    // coming, so it drops the claim the metadata POST created for it. The
+    // runtime cannot work this out on its own: a data POST refused at the door -
+    // a permission check, an expired token, a proxy - never reaches the route at
+    // all, so nothing there knows the upload ended and the claim stands for its
+    // full five-minute lifetime. Every retry inside that window is then refused
+    // as an overlapping upload, which is how a single failed upload came to read
+    // as a node that had stopped working.
+    //
+    // Fire-and-forget by design: the caller raises the notification that tells
+    // the user what happened, a second one here would only add noise, and if
+    // this call cannot get through either then whatever refused the upload is
+    // refusing this too and the runtime's own claim timeout is the backstop. It
+    // deliberately does not ride the upload's abort signal, which on one of
+    // these paths is the very thing that fired.
+    //
+    // Names the claim this upload made, because the two can be far apart in
+    // time: the browser gives an upload half an hour before it gives up on it,
+    // while the runtime reaps an unadopted claim after five minutes. A failure
+    // late in that window would otherwise release whichever claim happens to
+    // stand for the node - possibly one another editor session has just made,
+    // failing an upload that is doing nothing wrong. The runtime releases only
+    // what is named, and treats an unnamed release as it always did.
+    function releaseUploadClaim(targetId, streamId) {
+      let path = `node-red-contrib-fileinput/abort/${encodeURIComponent(targetId)}`
+      if (streamId) {
+        path += `?streamId=${encodeURIComponent(streamId)}`
+      }
+      const request = adminRequest(path)
+      $.ajax({
+        type: "POST",
+        url: request.url,
+        headers: Object.assign({ Accept: "application/json" }, request.headers),
+        timeout: globalControlTimeoutMs,
+      })
+    }
+    // Node names come from whoever authored the flow and file names come from
+    // the operator's filesystem, and both are shown in a notification that every
+    // open editor session receives. Strip the Unicode bidi and formatting
+    // controls that could re-order a prompt into reading as something it does
+    // not say, and bound the length.
+    function safeLabel(arg) {
+      const raw = String(arg === null || arg === undefined ? "" : arg)
+      // Everything invisible or direction-altering goes: the C0 and C1 control
+      // ranges, U+00AD, U+061C, U+180E, U+200B-U+200F, U+202A-U+202E,
+      // U+2028-U+2029, U+2060-U+2064, U+2066-U+2069, U+FEFF and the tag block
+      // U+E0000-U+E007F, which exists only to smuggle hidden text. A name has no
+      // business carrying any of them, and left in place they can make the label
+      // render shorter than it is or re-order the surrounding prompt into reading
+      // as something it does not say. They are matched by code point rather than
+      // by a \p{...} property escape because an unsupported property escape is a
+      // syntax error at parse time, which would take the whole node registration
+      // down on an older browser instead of merely degrading.
+      const chars = []
+      for (const ch of raw) {
+        const code = ch.codePointAt(0)
+        if (
+          code < 0x20 ||
+          (code >= 0x7f && code <= 0x9f) ||
+          code === 0x00ad ||
+          code === 0x061c ||
+          code === 0x180e ||
+          (code >= 0x200b && code <= 0x200f) ||
+          (code >= 0x2028 && code <= 0x2029) ||
+          (code >= 0x202a && code <= 0x202e) ||
+          (code >= 0x2060 && code <= 0x2064) ||
+          (code >= 0x2066 && code <= 0x2069) ||
+          code === 0xfeff ||
+          (code >= 0xe0000 && code <= 0xe007f)
+        ) {
+          continue
+        }
+        chars.push(ch)
+      }
+      // Iterating by code point also keeps the truncation below from cutting a
+      // surrogate pair in half and emitting a lone surrogate into the DOM.
+      const text =
+        chars.length > globalLabelMaxLen
+          ? `${chars.slice(0, globalLabelMaxLen).join("")}...`
+          : chars.join("")
+      if (!text) {
+        // Nothing survived, so return nothing. Wrapping an empty string in the
+        // isolates below would hand callers a truthy value for a label that is
+        // not there, and one of them picks its catalogue string on exactly that.
+        return ""
+      }
+      // Wrap what is left back up in a first-strong isolate. Stripping controls
+      // is not enough on its own: a name written in ordinary right-to-left script
+      // carries no control characters at all, yet still reorders the neutral text
+      // around it, so the quotes and the rest of the sentence could be made to
+      // read differently from what the catalogue says. RED.utils.getNodeLabel()
+      // applies isolation of its own for the same reason, which the strip above
+      // removes; this puts it back, in a form that survives truncation. Built
+      // from code points rather than written literally so the source stays
+      // readable - these characters are invisible in an editor.
+      return `${String.fromCodePoint(0x2066)}${text}${String.fromCodePoint(0x2069)}`
+    }
+    // A message on the node's input port raises a runtime event, which arrives
+    // here as a comms notification. It must not open the picker itself: a
+    // websocket callback carries no user activation, so the browser refuses the
+    // picker and logs "<input> picker was blocked due to lack of user
+    // activation". Arm the request instead and let the user's click on the
+    // notification supply the gesture the browser demands.
+    RED.comms.subscribe("notification/#", function (topic, payload) {
+      const sentinel = "notification/FILE-INPUT-"
+      if (!topic.startsWith(sentinel)) {
+        return
+      }
+      const { realId, expired } = payload || {}
+      // Arming and expiry share one topic and are told apart by this flag rather
+      // than by a second sentinel that the first one is a prefix of. A node id
+      // cannot collide with a payload field, and no correctness rests on which
+      // of two branches happens to be tested first.
+      if (expired) {
+        // The runtime gave up waiting and dropped the message it had primed, so
+        // this request has to come off the screen: answering it now would upload
+        // a file whose output carried none of that message's properties, with
+        // nothing to show that they had gone.
+        if (realId) {
+          clearPending(realId, false)
+        }
+        return
+      }
+      // A session that cannot complete the upload has no business being shown
+      // the prompt at all: its metadata POST is refused with a 401 before a
+      // single byte leaves the browser, so the file dialog could only mislead.
+      if (!RED.user.hasPermission("node-red-contrib-fileinput.write")) {
+        return
+      }
+      const id = topic.slice(sentinel.length).trim()
+      const node = RED.nodes.node(id)
+      // Only a fileinput node raises this topic today, so the type test is
+      // defence in depth: it costs nothing and keeps a future topic collision
+      // from arming a prompt against something else entirely.
+      if (!node || node.type !== "fileinput") {
+        return
+      }
+      armFilePicker(node, realId || id)
+    })
+    // A node deleted while its request is parked would leave behind a
+    // notification pointing at something the user can no longer act on. Requests
+    // are keyed by runtime id, so one editor node can name several of them.
+    // Deleting a subflow INSTANCE matches nothing here, because the entry names
+    // the template node the topic resolved to. That case is covered by the deploy
+    // handler below instead: until the deploy the runtime node is still live and
+    // still legitimately armed, and the node's own expiry event cannot cover it
+    // because closing a node cancels the timer that would have raised it.
+    RED.events.on("nodes:remove", function (node) {
+      if (!node || !node.id) {
+        return
+      }
+      Object.keys(globalPending).forEach(function (realId) {
+        if (globalPending[realId].node.id === node.id) {
+          clearPending(realId, false)
+        }
+      })
+    })
+    // A full deploy rebuilds the runtime nodes, so every parked request names an
+    // instance that no longer exists and no cancel is owed to any of them. A
+    // partial deploy may leave a node running and still armed, in which case this
+    // drops a notification early; the runtime's arm expiry then clears its side,
+    // and a further wire message arms it again.
+    RED.events.on("deploy", function () {
+      Object.keys(globalPending).forEach(function (realId) {
+        clearPending(realId, false)
+      })
     })
     RED.nodes.registerType("fileinput", {
       category: "prescient",
@@ -157,8 +682,17 @@
         return this.name || "file input"
       },
       button: {
-        onclick: async function () {
-          await openFilePicker(this)
+        // Not async, and openFilePicker() is called directly: this handler runs
+        // inside the user's click, and that is the only moment the browser will
+        // open a file picker.
+        onclick: function () {
+          if (!openFilePicker(this)) {
+            // Without this the button would simply do nothing while an upload on
+            // this node is still draining, which reads as a broken button.
+            const msg = notifyMsg(this, "fileinput.notification.busy")
+            globalIsInTest && console.log(`fileinput: ${msg}`)
+            RED.notify(notifyText(msg), "warning")
+          }
         },
       },
       oneditprepare: function () {

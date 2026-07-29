@@ -3,18 +3,29 @@
 -->
 <script type="text/html" data-help-name="fileinput">
   <p>
-    Asks user to select a file from the browser's file sytem and then emits its contents
-    as a message or messages if the streaming option is selected.
+    Asks the user to select a file from the browser's file system and then emits its
+    contents as a message or messages if the streaming option is selected.
   </p>
   <h3>Inputs</h3>
   <dl class="message-properties">
     <dt class="optional">[any properties]<span class="property-type">various</span></dt>
     <dd>
-      A message on the input port acts like clicking the node's button: it opens the file
-      picker in the open editor. Every property carried by the input message is merged into
-      the emitted output message(s), in both streaming and non-streaming mode. The node's
-      own properties (such as <code>filename</code>, <code>end</code> and the streaming
-      metadata) take precedence when a name collides.
+      A message on the input port asks the open editor for a file. Browsers only open a
+      file picker while a user gesture is active, so the message cannot open one on its
+      own: instead a notification appears in the editor with a <b>Choose file</b> button,
+      and clicking it opens the picker. Until then the node's status shows that it is
+      waiting; dismissing the notification clears it. Every property carried by the input
+      message is merged into the emitted output message(s), in both streaming and
+      non-streaming mode. The node's own properties (such as <code>filename</code>,
+      <code>end</code> and the streaming metadata) take precedence when a name collides.
+    </dd>
+    <dd>
+      A request that goes unanswered for ten minutes expires. The node stops waiting, its
+      status clears, the notification is withdrawn from the editor, and the input
+      message's properties are no longer held for merging: a file chosen after that point
+      is still uploaded and emitted, but carries none of them. Only the most recent input
+      message is held, so a second message arriving while a request is already waiting
+      replaces the first one's properties rather than queuing behind them.
     </dd>
   </dl>
   <h3>Outputs</h3>
@@ -60,6 +71,22 @@
     cannot cause unbounded queuing. If no acknowledgement arrives within 30 seconds the
     upload is aborted, so a <code>fileinput backpressure</code> node must be wired on the
     stream path when this option is enabled.
+  </p>
+  <p>
+    If the connection carrying an upload is severed, the upload fails and has to be
+    started again from the beginning. A retried or replayed request body can only join an
+    upload whose original connection is still open; once that connection is gone the
+    progress recorded against it is discarded rather than resumed, because the failure has
+    already been reported and the resumed part of the file would no longer carry the
+    properties of the input message that the earlier part carried.
+  </p>
+  <p>
+    An upload that fails in the editor before any of the file reaches the node - it is
+    refused, or it never leaves the browser - releases the node as soon as it fails and
+    reports the error, so the next attempt is accepted straight away rather than being
+    refused as an overlapping upload. Dismissing a request has the same effect: it is
+    refused only while a file is actually being received, and it clears an upload that
+    claimed the node but never delivered anything.
   </p>
 </script>
 

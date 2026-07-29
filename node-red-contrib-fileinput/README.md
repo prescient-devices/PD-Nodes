@@ -1,9 +1,21 @@
 @prescient-devices-oss/node-red-contrib-fileinput
 =================================================
 
-A node that once its buttons is pressed, prompts user to select a file from the
-browser's file system and then emits its contents as a message or a series of
+A node that, once its button is pressed, prompts the user to select a file from
+the browser's file system and then emits its contents as a message or a series of
 messages if the streaming option is selected.
+
+A message on the node's input port asks for a file as well. Browsers only open a
+file picker while a user gesture is active, so the message cannot open one on its
+own: a notification appears in the open editor with a **Choose file** button, and
+clicking it opens the picker. The properties of the input message are merged into
+every message the node then emits. A request that goes unanswered for ten minutes
+expires, and a file chosen after that point no longer carries those properties.
+
+If the connection carrying an upload is severed, the upload fails and has to be
+started again from the beginning rather than resuming where it stopped. An upload
+that fails before any of the file reaches the node releases it immediately, so the
+next attempt is accepted rather than refused as an overlapping upload.
 
 ### Installation
 
@@ -13,7 +25,7 @@ following commands (assuming the user's Node-RED directory is
 `${HOME}/.node-red`):
 
     $ cd "${HOME}"/.node-red
-    $ npm install --production node-red-contrib-fileinput
+    $ npm install --production @prescient-devices-oss/node-red-contrib-fileinput
     [...]
 
 ### Node
