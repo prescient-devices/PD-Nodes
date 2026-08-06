@@ -1,6 +1,17 @@
 {
   "name": "@prescient-devices/node-red-contrib-usb-camera",
   "version": "1.1.4",
+  "_comment": [
+    "DEAD STUB -- do not publish, and do not bump the version to 'catch up'.",
+    "This directory holds nothing but this file: the node source moved to",
+    "../node-red-contrib-usb-camera and was renamed to",
+    "@prescient-devices-oss/node-red-contrib-usb-camera. npmjs already carries",
+    "1.1.6 under BOTH names (both published 2024-09-26), so the 1.1.4 here is",
+    "not a package that failed to ship, it is a leftover manifest. Marked",
+    "private so npm and bin/publish-all.sh agree it is not publishable.",
+    "Safe to delete outright once nothing is found referencing the old name."
+  ],
+  "private": true,
   "description": "Front-end to the fswebcam utility to enable image capturing from within Node-RED",
   "main": "index.js",
   "scripts": {

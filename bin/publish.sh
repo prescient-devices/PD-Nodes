@@ -64,11 +64,20 @@ dir_basename="$1"
 echo "Directory: ${dir_basename}"
 echo "Scope: ${scope}"
 
-module_dir="$(readlink -f "${sdir}/../${dir_basename}")"
-if [ ! -d "${module_dir}" ]; then
-    echo -e "${sname}: directory ${module_dir} does not exist\n" >&2
+# Test the uncanonicalised path, and report THAT on failure. "readlink -f"
+# fails outright when an intermediate component is missing, leaving module_dir
+# empty -- so the old message read "directory  does not exist", naming nothing.
+# That is how publish-all.sh passing a package NAME here stayed unexplained:
+# the one line that could have said which path was wrong printed a blank.
+raw_dir="${sdir}/../${dir_basename}"
+if [ ! -d "${raw_dir}" ]; then
+    echo -e "${sname}: directory ${raw_dir} does not exist\n" >&2
+    case "${dir_basename}" in
+    @*) echo -e "${sname}: argument is a DIRECTORY, not a package name; the scope comes from -n\n" >&2 ;;
+    esac
     exit 1
 fi
+module_dir="$(readlink -f "${raw_dir}")"
 # Refuse to publish a tree that disagrees with its own lockfile.
 #
 # This runs BEFORE "npm login" on purpose, so the failure arrives without first
@@ -80,8 +89,9 @@ fi
 # rule rather than 15 negations: a per-package hook has to be remembered for
 # every package, and the package that gets forgotten is exactly the one that
 # ships wrong. publish.sh takes any directory, so every publish passes through
-# here whether or not the package is listed in publish-all.sh -- which matters,
-# because publish-all.sh names only 8 of the 13 scoped packages in this repo.
+# here whether it was run by hand or by publish-all.sh -- and publish-all.sh
+# routes every package back through this script, rather than calling npm itself,
+# so there is no path to the registry that skips this check.
 #
 # --require-tracked additionally rejects a lockfile that git does not track. An
 # untracked lock is what made the @prescient-devices/mssql-client drift
