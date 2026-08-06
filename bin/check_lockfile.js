@@ -6,7 +6,7 @@
  **/
 
 // VENDORED COPY -- keep byte-identical to the origin below this header.
-//   Origin: registries/prescient-devices/bin/check_lockfile.js at 4380477
+//   Origin: registries/prescient-devices/bin/check_lockfile.js at ab4bb9f
 //   Verify: diff <(tail -n +22 bin/check_lockfile.js) \
 //                <(tail -n +7 ../registries/prescient-devices/bin/check_lockfile.js)
 //
@@ -57,14 +57,85 @@
 // Every disagreement is a loud non-zero exit, never a warning. A guard that
 // warns is a guard that is scrolled past.
 //
+// ============================================================================
+// AND A TREE IT DID NOT LOOK AT IS NEVER REPORTED "OK".
+// ============================================================================
+// The first version of this script had the failure shape it exists to prevent.
+// A module with neither a package-lock.json nor a node_modules returned early
+// with `OK  ... has no lockfile and no node_modules` and exit 0 -- under
+// --require-tracked too, because the early return happened before that flag was
+// ever read. 14 of PD-Nodes' 15 package directories are in exactly that state,
+// so bin/publish.sh's --require-tracked gate passed 14 times having compared
+// nothing, which is the same permanent green as `npm ci --dry-run` above.
+//
+// Worse, EVERY mis-invocation landed in that branch. `-m /typo/path` names a
+// directory that does not exist, so it has no lockfile and no node_modules, so
+// it reported OK. The guard could be pointed anywhere at all and would agree
+// that everything was fine.
+//
+// The states are now told apart, because they are genuinely different:
+//
+//   -m names no directory, or a directory with no package.json
+//                      -> FAIL. Not an uninstalled module, a wrong argument.
+//                         package.json is tracked, so a fresh clone always has
+//                         one and this can never fire on the legitimate case.
+//   no lock, no tree    -> SKIP, exit 0, and SAY that nothing was checked --
+//                         naming --require-tracked as unevaluated when it was
+//                         passed. Not "OK": the word must not claim a
+//                         comparison that did not happen.
+//
+// WHY THAT IS A SKIP AND NOT A FAILURE, EVEN UNDER --require-tracked. It was
+// written as a failure first, and that was wrong twice over.
+//
+// The flag does not mean what the failure assumed. Its documented job, in
+// bin/publish.sh, is to be "a backstop for the enumerated negation list in the
+// root .gitignore" -- if a lock EXISTS, git must track it, so drift stays
+// reviewable. It never meant "a lock must exist". Widening it there would have
+// smuggled a new release policy into a bug fix.
+//
+// And the state it would have refused is not a defect. 14 of PD-Nodes' 15
+// package directories have neither a lock nor a tree; 4 of them declare no
+// dependencies at all. They are libraries, and npm IGNORES a package-lock.json
+// inside a published dependency -- a consumer resolves from the declared
+// ranges -- so no lock of theirs would ever reach anyone. Failing would have
+// blocked 12 of 13 publishes on a state that harms nobody, and this repo
+// already knows where that ends: noise is how a guard gets turned off. One
+// habitual `-f` and the check is gone from the cases that do matter.
+//
+// The drift this script exists to catch cannot occur here anyway. It needs a
+// vendored tree that disagrees with a lock, and there is no tree. The states
+// that CAN hide it all still fail hard: tree with no lock, tree that disagrees
+// with the lock, and -- under the flag -- a lock git does not track.
+//
+// The residual gap is real and named rather than papered over: --require-tracked
+// is a no-op on a module with no lockfile, so it cannot demand that one be
+// created. Making it do so is a policy change with an owner and a migration
+// (install and commit locks for 12 packages first), not a line in this file.
+// The SKIP line says so out loud every time it is hit.
+//
+// If that policy is ever adopted, the remedy to print is `npm install`, which
+// writes a lockfile AND the tree it describes. It is NOT `npm install
+// --package-lock-only`: that writes a lock recording a resolution nothing has
+// ever been run against, and no tree to compare it to. A fabricated lock looks
+// like a verified record from every angle except the one that matters.
+//
 // USAGE
 //   node check_lockfile.js [-m DIR] [--require-tracked] [--json] [-h]
 //
-//   -m DIR             module directory to check (default: cwd)
-//   --require-tracked  additionally require that DIR/package-lock.json is
-//                      tracked by git. An untracked lock is what made the
-//                      mssql-client drift undetectable in the first place.
-//   --json             emit machine-readable findings on stdout
+//   -m DIR             module directory to check (default: cwd). Must exist and
+//                      contain a package.json.
+//   --require-tracked  additionally require that DIR/package-lock.json exists
+//                      and is tracked by git. An untracked lock is what made
+//                      the mssql-client drift undetectable in the first place.
+//   --json             emit machine-readable findings on stdout, carrying a
+//                      `verdict` of "clean", "drift" or "skipped" so a consumer
+//                      can tell "nothing was wrong" from "nothing was checked"
+//
+// Every argument that is not one of the above is a hard failure. This script is
+// reached from bin/publish.sh, bin/test-runner.sh and PD-Edge's bundle build as
+// `if ! node check_lockfile.js ...; then`, so an argument quietly ignored is a
+// gate quietly removed -- and `-m DIR` is easy to get wrong when the sibling
+// publish.sh next to it takes its module name POSITIONALLY.
 //
 // Set SKIP_LOCK_CHECK=1 to bypass. Deliberately not advertised in the failure
 // output: the message there names the fix (`npm ci`), because a bypass offered
@@ -91,6 +162,9 @@ const path = require("path")
 // Constants
 const FAIL = "FAIL"
 const PASS = "OK  "
+// Padded to FAIL's width so the verdict column lines up, and distinct from PASS
+// because "checked and clean" and "not checked at all" are different answers
+const SKIP = "SKIP"
 
 /**
  * Abort loudly with a non-zero exit code
@@ -138,6 +212,23 @@ function collectInstalled(moduleDir, relDir, acc) {
     recordInstalled(moduleDir, path.join(relDir, entry.name), acc)
   }
   return acc
+}
+
+/**
+ * Report whether a path is an existing directory
+ *
+ * Follows symlinks deliberately: a module directory reached through one is
+ * still a module directory, and PD-Edge's bundle build resolves runtime_js with
+ * `readlink -f` before passing it here.
+ * @param {string} absPath - absolute path to test
+ * @returns {boolean} true when the path exists and is a directory
+ */
+function isDirectory(absPath) {
+  try {
+    return fs.statSync(absPath).isDirectory()
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -324,18 +415,55 @@ function parseArgs(argv) {
  */
 function main() {
   if (process.env.SKIP_LOCK_CHECK === "1") {
-    console.log(`${PASS} check_lockfile: skipped (SKIP_LOCK_CHECK=1)`)
+    // SKIP, not OK: the bypass verified nothing, and the word printed has to
+    // say so or the bypass reads as a clean bill of health in a CI log
+    console.log(
+      `${SKIP} check_lockfile: bypassed (SKIP_LOCK_CHECK=1), nothing was checked`
+    )
     return
   }
   const options = parseArgs(process.argv.slice(2))
   const { moduleDir } = options
+  // Establish the target BEFORE anything else. Every wrong -m used to fall
+  // through to the "no lockfile and no node_modules" branch below and report
+  // OK, so the guard agreed that a path which does not exist was in sync.
+  if (!isDirectory(moduleDir)) {
+    abort(
+      `-m ${moduleDir} is not a directory, so there is no module here to check. ` +
+        `Note that -m takes the directory as a SEPARATE argument; the module name ` +
+        `is not positional the way it is for publish.sh.`
+    )
+  }
+  if (!fs.existsSync(path.join(moduleDir, "package.json"))) {
+    abort(
+      `${moduleDir} has no package.json, so it is not a module directory. Check the ` +
+        `-m argument: reporting this tree as in sync would be a verdict about nothing.`
+    )
+  }
   const lockPath = path.join(moduleDir, "package-lock.json")
   const modulesPath = path.join(moduleDir, "node_modules")
   const hasLock = fs.existsSync(lockPath)
   const hasModules = fs.existsSync(modulesPath)
   if (!hasLock && !hasModules) {
+    // NOT a failure, and the reasoning is in the block comment at the top of
+    // this file. What it must never be again is `OK`.
+    if (options.json) {
+      console.log(
+        JSON.stringify({ moduleDir, verdict: "skipped", findings: [] }, null, 2)
+      )
+      return
+    }
+    // Say when the flag was asked for and could not be answered, at the moment
+    // it could not be answered. A flag that silently no-ops is how the caller
+    // comes to believe a check ran, which is the whole defect being fixed.
+    const unevaluated = options.requireTracked
+      ? ` --require-tracked could not be evaluated either: there is no lockfile whose ` +
+        `tracking status could be tested.`
+      : ""
     console.log(
-      `${PASS} check_lockfile: ${path.basename(moduleDir)} has no lockfile and no node_modules`
+      `${SKIP} check_lockfile: ${path.basename(moduleDir)} has neither a package-lock.json ` +
+        `nor a node_modules, so NOTHING was checked.${unevaluated} Run 'npm install' to ` +
+        `create both.`
     )
     return
   }
@@ -360,7 +488,8 @@ function main() {
     })
   }
   if (options.json) {
-    console.log(JSON.stringify({ moduleDir, findings }, null, 2))
+    const verdict = findings.length === 0 ? "clean" : "drift"
+    console.log(JSON.stringify({ moduleDir, verdict, findings }, null, 2))
   }
   if (findings.length === 0) {
     if (!options.json) {
