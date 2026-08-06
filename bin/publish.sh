@@ -113,10 +113,12 @@ fi
 # The public registry holds 1.2.3.
 #
 # Until 2026-08-06 these packages reached npmjs.org only BY ACCIDENT: the
-# "npm login --scope=... --registry=..." on the next line REWRITES the
+# "npm login" below carried "--scope=...", which REWROTE the
 # "@prescient-devices:registry" line in ~/.npmrc as a side effect, and that
 # rewrite -- not the flag -- is what redirected the publish. While rewritten,
-# the ~96 private @prescient-devices packages resolve to npmjs.org too.
+# the ~96 private @prescient-devices packages resolved to npmjs.org too. Both
+# halves are now fixed: the manifest pins the destination, and "--scope" is gone
+# from the login so nothing touches ~/.npmrc.
 #
 # The destination is now pinned where it cannot be lost: each publishable
 # manifest here carries
@@ -127,13 +129,30 @@ fi
 # the scoped ~/.npmrc line outranks; it is kept beside the scoped key for
 # non-npm publishers (yarn) and for the case where the scoped line is absent.
 #
-# The flags are left in place because they are inert for these scoped names
-# ("npm publish --dry-run" reports the same target with and without them) and
-# because dropping "--registry" would hand the @prescient-devices-oss packages
-# -- which have no scoped pin -- to whatever global default the operator's
-# ~/.npmrc happens to hold. Do not add a third escaper for the registry here:
-# pin it in the manifest.
-if ! npm login --scope="${scope}" --registry=https://registry.npmjs.org; then
+# "--registry" is left in place because it is inert for these scoped names
+# ("npm publish --dry-run" reports the same target with and without it) and
+# because dropping it would hand the @prescient-devices-oss packages -- which
+# have no scoped pin -- to whatever global default the operator's ~/.npmrc
+# happens to hold. Do not add a third escaper for the registry here: pin it in
+# the manifest.
+#
+# "--scope" IS GONE FROM THE LOGIN, and that is the point of this line. It was
+# the thing rewriting "@prescient-devices:registry" in the operator's ~/.npmrc,
+# and npm does not put it back -- so every publish from here left the ~96
+# private packages under that scope resolving to npmjs.org until someone
+# noticed. That is not merely untidy: some names exist in BOTH registries with
+# different lineages (node-red-node-mqtt-in-json is 1.6.2 on GHP and 1.2.3 on
+# npmjs), so an install in that window fetches a stale package instead of
+# failing loudly.
+#
+# Without "--scope", npm writes only "//registry.npmjs.org/:_authToken" and no
+# "@scope:registry" line at all. Authentication still resolves because
+# publish.js looks credentials up by the RESOLVED registry URI
+# (getCredentialsByURI), and that URI is now pinned by the manifest rather than
+# inferred from a scope mapping. Reasoned from npm's source, NOT verified by
+# running a real login -- the login is itself the destructive step. If a publish
+# ever fails to authenticate here, this line is the first suspect.
+if ! npm login --registry=https://registry.npmjs.org; then
     echo -e "${sname}: cannot authenticate to npm registry\n" >&2
     exit 1
 fi
