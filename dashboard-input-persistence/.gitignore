@@ -1,3 +1,8 @@
 /node_modules
 node-*.tgz
-package-lock.json
+# "package-lock.json" was removed here, not just at the repo root. A deeper .gitignore
+# always beats a shallower re-include, so leaving this line in place would have silently
+# defeated the root rule from underneath -- the root would have looked correct while this
+# package's lock stayed invisible. This was the only package in the repo doing it, and it
+# was found only by running "git check-ignore -v" per directory rather than trusting the
+# root edit. Re-verify the same way after any change here: no output means visible.

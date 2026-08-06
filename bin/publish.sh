@@ -69,6 +69,27 @@ if [ ! -d "${module_dir}" ]; then
     echo -e "${sname}: directory ${module_dir} does not exist\n" >&2
     exit 1
 fi
+# Refuse to publish a tree that disagrees with its own lockfile.
+#
+# This runs BEFORE "npm login" on purpose, so the failure arrives without first
+# prompting for credentials, and so a login failure can never be what stops the
+# check from running.
+#
+# Wired here rather than into a "prepublishOnly" hook in each of the 15
+# package.json files, for the same reason the .gitignore rule is a single root
+# rule rather than 15 negations: a per-package hook has to be remembered for
+# every package, and the package that gets forgotten is exactly the one that
+# ships wrong. publish.sh takes any directory, so every publish passes through
+# here whether or not the package is listed in publish-all.sh -- which matters,
+# because publish-all.sh names only 8 of the 13 scoped packages in this repo.
+#
+# --require-tracked additionally rejects a lockfile that git does not track. An
+# untracked lock is what made the @prescient-devices/mssql-client drift
+# undetectable for months; see the header of bin/check_lockfile.js.
+if ! node "${sdir}"/check_lockfile.js -m "${module_dir}" --require-tracked; then
+    echo -e "${sname}: refusing to publish ${dir_basename}\n" >&2
+    exit 1
+fi
 if ! npm login --scope="${scope}" --registry=https://registry.npmjs.org; then
     echo -e "${sname}: cannot authenticate to npm registry\n" >&2
     exit 1

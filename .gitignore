@@ -1,4 +1,16 @@
 .hooks/repo-cfg.sh
-package-lock.json
+# DO NOT re-add "package-lock.json" here. Every tracked package.json in this repo must
+# have a tracked package-lock.json beside it. A package.json records what was ASKED for;
+# only the lock records what was actually resolved, and every directory here is a
+# PUBLISHED npm package -- so a lock nobody can see is a tree nobody can review.
+#
+# @prescient-devices/mssql-client shipped a total outage exactly this way: its
+# node_modules held util 1.18.1 while its own lock already pinned 1.26.5, util 1.20.6
+# renamed RetryMngr's `args` to `funcArgs` in a PATCH bump, and every query() rejected
+# before any SQL reached the server, for months. The lock was gitignored, so the tree it
+# ran against and the tree it claimed to run against were never compared by anything.
+#
+# Locks inside node_modules/ stay ignored: git cannot re-include a file whose parent
+# directory is excluded. That is the intended scope.
 .npmrc
 node_modules/
