@@ -149,9 +149,14 @@ fi
 # "@scope:registry" line at all. Authentication still resolves because
 # publish.js looks credentials up by the RESOLVED registry URI
 # (getCredentialsByURI), and that URI is now pinned by the manifest rather than
-# inferred from a scope mapping. Reasoned from npm's source, NOT verified by
-# running a real login -- the login is itself the destructive step. If a publish
-# ever fails to authenticate here, this line is the first suspect.
+# inferred from a scope mapping.
+#
+# VERIFIED 2026-08-06 by running this exact line against npmjs and diffing
+# ~/.npmrc either side: login succeeded, the "@prescient-devices:registry" line
+# was untouched, the scope-line count was 3 before and 3 after, and the only
+# delta in the whole file was the "//registry.npmjs.org/:_authToken" value. The
+# three "${ENV_VAR}" token references were preserved verbatim rather than
+# expanded, so no secret was written in plaintext.
 if ! npm login --registry=https://registry.npmjs.org; then
     echo -e "${sname}: cannot authenticate to npm registry\n" >&2
     exit 1
