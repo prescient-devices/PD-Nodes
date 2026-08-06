@@ -17,6 +17,11 @@
         "type": "git",
         "url": "ssh://git@github.com:prescient-devices/PD-Nodes.git"
     },
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/",
+        "@prescient-devices:registry": "https://registry.npmjs.org/"
+    },
     "node-red": {
         "version": ">=0.14.0",
         "nodes": {

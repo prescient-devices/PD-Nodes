@@ -81,6 +81,16 @@ root="$(cd -P "${sdir}/.." && pwd)"
 # Same registry publish.sh names on its "npm publish" line. Kept identical on
 # purpose: the up-to-date check has to ask the registry publish.sh writes to, or
 # it would skip a package that is not actually there.
+#
+# That agreement was only NOMINAL until 2026-08-06, and in opposite directions.
+# registry_version() below passes the SCOPED flag "--@scope:registry=", which
+# does win, so this check has always queried npmjs.org correctly. publish.sh
+# passed only "--registry=", which does NOT win for a scoped name, so the
+# publish itself was aimed at whatever "@prescient-devices:registry" said in
+# ~/.npmrc and reached npmjs.org solely via the side effect of "npm login".
+# See the block above publish.sh's login/publish lines. The two now agree for a
+# real reason: every publishable manifest pins its own registry in
+# publishConfig, which outranks both the ~/.npmrc scoped line and "--registry".
 registry="https://registry.npmjs.org"
 
 OPTIND=1

@@ -100,6 +100,39 @@ if ! node "${sdir}"/check_lockfile.js -m "${module_dir}" --require-tracked; then
     echo -e "${sname}: refusing to publish ${dir_basename}\n" >&2
     exit 1
 fi
+# THE "--registry" FLAGS BELOW DO NOT CHOOSE THE REGISTRY. Measured, npm 10.9.8.
+#
+# For a SCOPED package name npm resolves the publish target with
+# npm-registry-fetch's pickRegistry(), which consults "@scope:registry" FIRST and
+# only falls back to "registry" when no scoped key is set. A developer ~/.npmrc
+# carrying
+#     @prescient-devices:registry=https://npm.pkg.github.com/prescient-devices/
+# therefore beats "--registry" outright, and "--scope" does not change that:
+#     npm view @prescient-devices/node-red-node-mqtt-in-json version \
+#       --registry=https://registry.npmjs.org   ->  1.6.2  (the GITHUB version)
+# The public registry holds 1.2.3.
+#
+# Until 2026-08-06 these packages reached npmjs.org only BY ACCIDENT: the
+# "npm login --scope=... --registry=..." on the next line REWRITES the
+# "@prescient-devices:registry" line in ~/.npmrc as a side effect, and that
+# rewrite -- not the flag -- is what redirected the publish. While rewritten,
+# the ~96 private @prescient-devices packages resolve to npmjs.org too.
+#
+# The destination is now pinned where it cannot be lost: each publishable
+# manifest here carries
+#     "publishConfig": { "@prescient-devices:registry": "https://registry.npmjs.org/" }
+# which is the ONE form that wins, because @npmcli/config's flatten() passes
+# "@scope:registry" keys straight through into the options pickRegistry reads.
+# Plain "publishConfig.registry" does NOT win -- it only sets the fallback that
+# the scoped ~/.npmrc line outranks; it is kept beside the scoped key for
+# non-npm publishers (yarn) and for the case where the scoped line is absent.
+#
+# The flags are left in place because they are inert for these scoped names
+# ("npm publish --dry-run" reports the same target with and without them) and
+# because dropping "--registry" would hand the @prescient-devices-oss packages
+# -- which have no scoped pin -- to whatever global default the operator's
+# ~/.npmrc happens to hold. Do not add a third escaper for the registry here:
+# pin it in the manifest.
 if ! npm login --scope="${scope}" --registry=https://registry.npmjs.org; then
     echo -e "${sname}: cannot authenticate to npm registry\n" >&2
     exit 1
