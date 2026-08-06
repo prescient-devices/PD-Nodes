@@ -6,7 +6,7 @@
  **/
 
 // VENDORED COPY -- keep byte-identical to the origin below this header.
-//   Origin: registries/prescient-devices/bin/check_lockfile.js at ab4bb9f
+//   Origin: registries/prescient-devices/bin/check_lockfile.js at 193115c
 //   Verify: diff <(tail -n +22 bin/check_lockfile.js) \
 //                <(tail -n +7 ../registries/prescient-devices/bin/check_lockfile.js)
 //
@@ -17,8 +17,8 @@
 // The script needs nothing beyond child_process, fs and path, so a copy costs
 // one file and no install step.
 //
-// Fix bugs in the origin FIRST, then re-copy here, so the three copies (this one,
-// PD-Edge, and the registry) never diverge silently.
+// Fix bugs in the ORIGIN first, then run `node sync_vendored.js` in its bin/ to
+// rebuild all four copies (this one, PD-Edge, edl-base and the registry).
 
 // ============================================================================
 // WHY THIS EXISTS: A NODE_MODULES THAT DISAGREES WITH THE LOCK IS INVISIBLE.
@@ -109,24 +109,60 @@
 //
 // The residual gap is real and named rather than papered over: --require-tracked
 // is a no-op on a module with no lockfile, so it cannot demand that one be
-// created. Making it do so is a policy change with an owner and a migration
-// (install and commit locks for 12 packages first), not a line in this file.
-// The SKIP line says so out loud every time it is hit.
+// created. Making --require-tracked itself do so would be a policy change
+// smuggled into a bug fix, which is why it is a SEPARATE flag instead.
 //
-// If that policy is ever adopted, the remedy to print is `npm install`, which
-// writes a lockfile AND the tree it describes. It is NOT `npm install
-// --package-lock-only`: that writes a lock recording a resolution nothing has
-// ever been run against, and no tree to compare it to. A fabricated lock looks
-// like a verified record from every angle except the one that matters.
+// ============================================================================
+// --require-lockfile: THE STRICTER POLICY, OPT-IN, AND WIRED IN BY NOBODY YET.
+// ============================================================================
+// "Must a package be publishable with no recorded resolution at all?" has a
+// different right answer per repository, so it is a flag rather than a rule:
+//
+//   PD-Nodes    14 of 15 package directories have neither a lock nor a tree.
+//               They are libraries, and npm IGNORES a package-lock.json inside
+//               a published dependency -- a consumer resolves from the declared
+//               ranges -- so no lock of theirs would ever reach anyone.
+//               Requiring one blocks 12 of 13 publishes on a state that harms
+//               nobody, and this repo already knows where that ends: one
+//               habitual `-f` and the check is gone from the cases that matter.
+//
+//   PD-Edge     genuinely different. runtime_js is provisioned with `npm
+//               install --no-save --omit=dev` and build-provisioner-bundle.sh
+//               tars `cp -r runtime_js` to S3, so the lock SHIPS, to the fleet.
+//               A missing one there is a reproducibility question about every
+//               device, not a library's private bookkeeping.
+//
+// So this flag exists and NOTHING PASSES IT. It is deliberately not wired into
+// any publish.sh here: adoption is a per-repo decision with an owner, and a
+// flag that arrives already switched on is a policy nobody chose.
+//
+// WHAT IT CHANGES, EXACTLY. One state, and only one: "no lock AND no tree",
+// which is a SKIP by default, becomes a failure. Every other verdict is
+// untouched, because every other state already fails hard -- a tree with no
+// lock, a tree that disagrees with its lock, and, under --require-tracked, a
+// lock git does not track.
+//
+// THE REMEDY IT PRINTS IS `npm install`, which writes a lockfile AND the tree
+// it describes. It is NOT `npm install --package-lock-only`: that writes a lock
+// recording a resolution nothing has ever been run against, and no tree to
+// compare it to. A fabricated lock looks like a verified record from every
+// angle except the one that matters, and it would satisfy this flag while
+// leaving the drift the whole script exists to catch entirely undetectable.
 //
 // USAGE
-//   node check_lockfile.js [-m DIR] [--require-tracked] [--json] [-h]
+//   node check_lockfile.js [-m DIR] [--require-tracked] [--require-lockfile]
+//                          [--json] [-h]
 //
 //   -m DIR             module directory to check (default: cwd). Must exist and
 //                      contain a package.json.
 //   --require-tracked  additionally require that DIR/package-lock.json exists
 //                      and is tracked by git. An untracked lock is what made
 //                      the mssql-client drift undetectable in the first place.
+//                      A no-op when there is no lockfile at all, and it says so.
+//   --require-lockfile additionally require that a lockfile EXISTS, turning the
+//                      "no lock and no tree" SKIP into a failure. Independent
+//                      of --require-tracked, which asks a question about a lock
+//                      that is already there.
 //   --json             emit machine-readable findings on stdout, carrying a
 //                      `verdict` of "clean", "drift" or "skipped" so a consumer
 //                      can tell "nothing was wrong" from "nothing was checked"
@@ -156,6 +192,7 @@ const path = require("path")
  * @typedef {object} Options
  * @property {string} moduleDir - absolute path of the module to check
  * @property {boolean} requireTracked - whether to require a git-tracked lockfile
+ * @property {boolean} requireLockfile - whether to require that a lockfile exists
  * @property {boolean} json - whether to emit JSON instead of prose
  */
 
@@ -387,11 +424,18 @@ function isTracked(moduleDir, fname) {
  * @returns {Options} parsed options
  */
 function parseArgs(argv) {
-  const options = { moduleDir: process.cwd(), requireTracked: false, json: false }
+  const options = {
+    moduleDir: process.cwd(),
+    requireTracked: false,
+    requireLockfile: false,
+    json: false,
+  }
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]
     if (arg === "-h" || arg === "--help") {
-      console.log("Usage: check_lockfile.js [-m DIR] [--require-tracked] [--json]")
+      console.log(
+        "Usage: check_lockfile.js [-m DIR] [--require-tracked] [--require-lockfile] [--json]"
+      )
       console.log("Set SKIP_LOCK_CHECK=1 to bypass.")
       process.exit(0)
     } else if (arg === "-m") {
@@ -400,6 +444,8 @@ function parseArgs(argv) {
       options.moduleDir = path.resolve(argv[i])
     } else if (arg === "--require-tracked") {
       options.requireTracked = true
+    } else if (arg === "--require-lockfile") {
+      options.requireLockfile = true
     } else if (arg === "--json") {
       options.json = true
     } else {
@@ -445,6 +491,38 @@ function main() {
   const hasLock = fs.existsSync(lockPath)
   const hasModules = fs.existsSync(modulesPath)
   if (!hasLock && !hasModules) {
+    // The ONE state --require-lockfile changes, and it is opt-in: without the
+    // flag this is a SKIP, for the reasons in the block comment at the top of
+    // this file. `npm install` is named rather than `--package-lock-only`
+    // because the latter satisfies the flag while creating nothing to compare.
+    if (options.requireLockfile) {
+      const finding = {
+        kind: "NOLOCK",
+        location: "package-lock.json",
+        expected: "present",
+        actual: "absent",
+      }
+      if (options.json) {
+        // A distinct verdict, not "drift": nothing drifted, because there was
+        // never a resolution recorded. A consumer switching on the known
+        // verdicts gets an unfamiliar value rather than a false "clean".
+        console.log(
+          JSON.stringify(
+            { moduleDir, verdict: "no-lockfile", findings: [finding] },
+            null,
+            2
+          )
+        )
+        process.exit(1)
+      }
+      abort(
+        `${path.basename(moduleDir)} has no package-lock.json, and --require-lockfile ` +
+          `was given, so there is no recorded resolution for this package at all. Run ` +
+          `'npm install' to create a lockfile AND the tree it describes -- NOT 'npm ` +
+          `install --package-lock-only', which records a resolution nothing has been run ` +
+          `against and leaves nothing to compare it to.`
+      )
+    }
     // NOT a failure, and the reasoning is in the block comment at the top of
     // this file. What it must never be again is `OK`.
     if (options.json) {
