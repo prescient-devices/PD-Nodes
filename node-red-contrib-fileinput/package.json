@@ -30,9 +30,9 @@
     "clone": "^2.1.2",
     "jshint": "^2.13.5",
     "mocha": "^8.4.0",
-    "node-red": "^2.2.2",
+    "node-red": "^5.0.4",
     "prettier": "^2.7.1",
-    "puppeteer": "^16.1.0",
+    "puppeteer": "^25.5.0",
     "rimraf": "^3.0.2"
   }
 }
