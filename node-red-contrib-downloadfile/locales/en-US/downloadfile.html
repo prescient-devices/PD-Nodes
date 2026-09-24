@@ -2,7 +2,7 @@
   Copyright 2022-Present Prescient Devices, Inc.
 -->
 <script type="text/html" data-help-name="downloadfile">
-    <p>Saves message payloads to a file in the browser's download folder.</p>
+    <p>Saves message payloads to a file through the browser.</p>
     <p>The node has two modes. With <b>Stream</b> off, each message becomes its own
     file. With <b>Stream</b> on, a whole stream of messages becomes one file.</p>
 
@@ -25,8 +25,33 @@
     <p>When the first message arrives, every open editor shows a banner with a
     <b>Download</b> button. Somebody must click <b>Download</b> within 10 minutes.
     If nobody clicks, the download expires. <b>Dismiss</b> cancels it.</p>
-    <p>The file goes to the download folder of the browser where somebody clicked.
-    The node cannot choose the folder.</p>
+    <p>Where the file goes depends on the browser where somebody clicked. The node
+    cannot choose the folder.</p>
+    <ul>
+        <li><b>Chrome and Microsoft Edge</b>: <b>Download</b> opens a save dialog
+        with the file name filled in. The file is written straight to the file you
+        choose. This needs a secure page: the editor must be on <code>https</code>
+        or on <code>localhost</code>. Cancel in the dialog keeps the banner, so you
+        can click <b>Download</b> again or <b>Dismiss</b>. On a plain
+        <code>http</code> page, these browsers save as described in the next
+        item.</li>
+        <li><b>Firefox and Safari</b>: they do not open this save dialog. They save
+        the file in their default download folder, on macOS usually
+        <code>~/Downloads</code>. They ask where to save only when the browser's own
+        setting is on. In Firefox, this is Settings, General, Files and Applications,
+        "Always ask you where to save files". In Safari, it is Settings, General,
+        "File download location", set to "Ask for each download".</li>
+    </ul>
+    <p><b>Pick a new file name to be safe.</b> If you choose an existing file in the
+    save dialog and confirm Replace, the browser empties that file at once. If the
+    download then fails or is stopped, the editor deletes the file. So the old
+    contents are lost either way. If the browser cannot delete the file, the
+    editor says that it may be left empty.</p>
+    <p>Chrome and Microsoft Edge also have their own setting. In Chrome, it is
+    Settings, Downloads, "Ask where to save each file before downloading". In
+    Microsoft Edge, it is the setting in Settings, Downloads that asks what to do
+    with each download. These settings matter only where the save dialog above is
+    not available.</p>
     <p>A node works on one stream at a time. The node tells streams apart by
     <code>msg._streamID</code>. Put the same <code>_streamID</code> on every message
     of a stream, the final message included. A final message with a
@@ -119,7 +144,9 @@
         <li>The source ends the stream with a truthy value at the Error property.</li>
         <li>The node is redeployed.</li>
     </ul>
-    <p>The browser then marks the file as failed. The node sends each held message
+    <p>The browser then marks the file as failed. After the save dialog of Chrome or
+    Microsoft Edge, the editor shows an error instead and deletes the chosen file,
+    so no short file is left. The node sends each held message
     straight on, without writing it. Then it sends exactly one message of its own with
     the state and <code>msg.complete</code> set to <code>true</code>. When the
     source's final message is already held, that message is the one, and it goes out

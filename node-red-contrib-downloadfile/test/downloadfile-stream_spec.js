@@ -1429,6 +1429,7 @@ describe("Downloadfile node", function () {
         "Prescient Devices, Inc.",
         "@prescient-devices-oss",
         "github.com/prescient-devices/PD-Nodes",
+        "Microsoft Edge",
       ]
       const allowedIn = { "downloadfile.html": ['category: "prescient"'] }
       const names = [

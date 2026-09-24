@@ -30,10 +30,15 @@
       "download_dismiss": "Dismiss",
       "download_expired": "This download request has expired and the file is gone",
       "download_failed": "Could not start the download, please try again",
+      "download_gone": "This download is no longer available",
+      "download_left_empty": "__filename__ may be left empty.",
       "download_ready": "File ready to download from \"__node__\": __filename__",
       "download_ready_flow": "File ready to download from \"__node__\" in flow \"__flow__\": __filename__",
       "download_ready_flow_noname": "File ready to download from \"__node__\" in flow \"__flow__\"",
-      "download_ready_noname": "File ready to download from \"__node__\""
+      "download_ready_noname": "File ready to download from \"__node__\"",
+      "download_save_failed": "The download failed. __filename__ was not saved.",
+      "download_saved": "Saved as __filename__",
+      "download_saving": "Saving __filename__"
     },
     "errors": {
       "bad_payload": "A payload could not be turned into text: __error__",

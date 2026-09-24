@@ -185,10 +185,12 @@
       return { url: root + path, headers }
     }
     // Take the file for this browser and then save it. Two steps, because the
-    // download itself is a navigation, and a navigation cannot carry the
+    // download itself can be a navigation, and a navigation cannot carry the
     // Authorization header. This POST carries it and passes the permission
     // check, and it answers with a one-time ticket the download route accepts.
-    function claimDownload(downloadId) {
+    // With a file handle from the save dialog, the file is written there;
+    // without one, the browser's download manager saves it.
+    function claimDownload(downloadId, handle) {
       const entry = globalDownloads[downloadId]
       if (!entry || entry.claiming) {
         return
@@ -208,28 +210,32 @@
           const ticket = (data || {}).ticket
           if (typeof ticket !== "string" || !globalHexIdRe.test(ticket)) {
             entry.claiming = false
-            RED.notify(notifyText(node._("downloadfile.info.download_failed")), "error")
+            notifyFailure(node, handle, "downloadfile.info.download_failed", "error")
             return
           }
           clearDownload(downloadId, false)
-          saveDownload(ticket)
+          if (handle) {
+            saveToFile(node, handle, ticket)
+          } else {
+            saveDownload(ticket)
+          }
         },
         error: function (jqXHR) {
           if (jqXHR.status === 409) {
             // Somebody else clicked first.
             clearDownload(downloadId, false)
-            RED.notify(notifyText(node._("downloadfile.info.download_claimed")))
+            notifyFailure(node, handle, "downloadfile.info.download_claimed")
             return
           }
           if (jqXHR.status === 404) {
             // The ten minutes ran out and the runtime has dropped the download.
             clearDownload(downloadId, false)
-            RED.notify(notifyText(node._("downloadfile.info.download_expired")))
+            notifyFailure(node, handle, "downloadfile.info.download_expired")
             return
           }
           // Anything else may work on a second attempt, so the banner stays.
           entry.claiming = false
-          RED.notify(notifyText(node._("downloadfile.info.download_failed")), "error")
+          notifyFailure(node, handle, "downloadfile.info.download_failed", "error")
         },
       })
     }
@@ -277,6 +283,21 @@
     // is the same one sanitizeFilename() in downloadfile-stream_core.js deletes;
     // change both together.
     function safeLabel(arg) {
+      const chars = Array.from(stripHidden(arg))
+      const text =
+        chars.length > globalLabelMaxLen
+          ? `${chars.slice(0, globalLabelMaxLen).join("")}...`
+          : chars.join("")
+      if (!text) {
+        return ""
+      }
+      // A first-strong isolate, so right-to-left text in a name cannot reorder
+      // the rest of the sentence.
+      return `${String.fromCodePoint(0x2066)}${text}${String.fromCodePoint(0x2069)}`
+    }
+    // The text with the invisible and direction-altering characters deleted.
+    // Used by safeLabel(), and for the name offered in the save dialog.
+    function stripHidden(arg) {
       const raw = String(arg === null || arg === undefined ? "" : arg)
       const chars = []
       for (const ch of raw) {
@@ -300,16 +321,7 @@
         }
         chars.push(ch)
       }
-      const text =
-        chars.length > globalLabelMaxLen
-          ? `${chars.slice(0, globalLabelMaxLen).join("")}...`
-          : chars.join("")
-      if (!text) {
-        return ""
-      }
-      // A first-strong isolate, so right-to-left text in a name cannot reorder
-      // the rest of the sentence.
-      return `${String.fromCodePoint(0x2066)}${text}${String.fromCodePoint(0x2069)}`
+      return chars.join("")
     }
     // Put a banner on screen for a download the runtime is holding.
     function showDownloadBanner(node, downloadId, filename) {
@@ -324,7 +336,16 @@
         name ? "" : "_noname"
       }`
       const text = node._(key, { node: label, flow, filename: name })
-      const entry = { node, notification: null, timer: null, claiming: false }
+      const entry = {
+        node,
+        // The name the runtime already sanitised, offered in the save dialog.
+        filename: typeof filename === "string" ? filename : "",
+        notification: null,
+        timer: null,
+        claiming: false,
+        // `true` while the save dialog is open.
+        picking: false,
+      }
       globalDownloads[downloadId] = entry
       entry.timer = window.setTimeout(function () {
         clearDownload(downloadId, false)
@@ -336,7 +357,7 @@
             text: node._("downloadfile.info.download_button"),
             class: "primary",
             click: function () {
-              claimDownload(downloadId)
+              startDownload(downloadId)
             },
           },
           {
@@ -348,8 +369,213 @@
         ],
       })
     }
+    // Extensions the save dialog gets a file type for, and that type. The same
+    // extensions the runtime's contentTypeFor() names a type for. Any other
+    // extension gets no `types` entry, because the dialog throws a TypeError on
+    // an extension or a type it does not accept. Object.create(null), so an
+    // extension such as ".constructor" finds nothing.
+    const globalPickerTypes = Object.assign(Object.create(null), {
+      csv: "text/csv",
+      json: "application/json",
+      log: "text/plain",
+      txt: "text/plain",
+    })
+    // Can this browser show a save dialog? The File System Access API exists in
+    // Chrome and Microsoft Edge, and only in a secure context (https, or
+    // localhost).
+    function canPickFile() {
+      return (
+        window.isSecureContext === true &&
+        typeof window.showSaveFilePicker === "function"
+      )
+    }
+    // The save dialog's options: the name the runtime will send, and a file type
+    // when the extension is one of globalPickerTypes.
+    function pickerOptions(proposed) {
+      const options = {}
+      // The same filter as the banner, so the dialog and the banner show the
+      // same name even when something other than the runtime sent the event.
+      const filename = stripHidden(proposed)
+      if (!filename) {
+        return options
+      }
+      options.suggestedName = filename
+      const match = /\.([A-Za-z0-9]{1,16})$/.exec(filename)
+      const mime = match ? globalPickerTypes[match[1].toLowerCase()] : undefined
+      if (mime) {
+        const accept = {}
+        accept[mime] = [`.${match[1]}`]
+        options.types = [{ accept }]
+      }
+      return options
+    }
+    // The Download button. When the browser can show a save dialog, it opens
+    // first, inside the click: the browser allows it only while the click is
+    // fresh, so nothing is awaited before it. Nothing is claimed until a file is
+    // chosen, so Cancel in the dialog leaves the banner and the download open.
+    // Any other failure of the dialog falls back to the download manager.
+    function startDownload(downloadId) {
+      const entry = globalDownloads[downloadId]
+      if (!entry || entry.claiming || entry.picking) {
+        return
+      }
+      if (!canPickFile()) {
+        claimDownload(downloadId, null)
+        return
+      }
+      let picked
+      try {
+        picked = window.showSaveFilePicker(pickerOptions(entry.filename))
+      } catch (_) {
+        claimDownload(downloadId, null)
+        return
+      }
+      entry.picking = true
+      Promise.resolve(picked).then(
+        function (handle) {
+          entry.picking = false
+          if (globalDownloads[downloadId] !== entry) {
+            // Claimed in another editor, expired, or its node deleted while the
+            // dialog was open.
+            notifyFailure(entry.node, handle, "downloadfile.info.download_gone")
+            return
+          }
+          claimDownload(downloadId, handle || null)
+        },
+        function (error) {
+          entry.picking = false
+          if (error && error.name === "AbortError") {
+            // The user closed the dialog. The banner stays for another try.
+            return
+          }
+          if (globalDownloads[downloadId] === entry) {
+            claimDownload(downloadId, null)
+          }
+        }
+      )
+    }
+    // Stop a failed write to a chosen file. Aborting the writable makes the
+    // browser discard its temporary copy, so the chosen file never gets a short
+    // file that looks whole. Cancelling an unread body closes the connection, so
+    // the runtime stops the download. Resolves when the abort has settled, so
+    // the file is no longer locked by the writable.
+    function discardSave(response, writable) {
+      const ignore = function () {}
+      if (response && response.body && !response.bodyUsed) {
+        try {
+          response.body.cancel().catch(ignore)
+        } catch (_) {}
+      }
+      if (!writable) {
+        return Promise.resolve()
+      }
+      try {
+        return Promise.resolve(writable.abort()).catch(ignore)
+      } catch (_) {
+        return Promise.resolve()
+      }
+    }
+    // Delete the file the save dialog chose. Chrome creates that file, or
+    // empties an existing one, as soon as the dialog closes, so a failed
+    // download would leave an empty file behind. handle.remove() exists in
+    // Chrome and Microsoft Edge 110 and later. Resolves `true` when the file is
+    // gone, `false` when it may still be there.
+    function discardChosenFile(handle) {
+      if (!handle || typeof handle.remove !== "function") {
+        return Promise.resolve(false)
+      }
+      try {
+        return Promise.resolve(handle.remove()).then(
+          function () {
+            return true
+          },
+          function () {
+            return false
+          }
+        )
+      } catch (_) {
+        return Promise.resolve(false)
+      }
+    }
+    // Tell the user that a download did not reach the disk. After the save
+    // dialog, delete the chosen file first, and add a sentence when that fails.
+    function notifyFailure(node, handle, key, type) {
+      if (!handle) {
+        RED.notify(notifyText(node._(key)), type)
+        return
+      }
+      const name = safeLabel(handle.name)
+      discardChosenFile(handle).then(function (deleted) {
+        let text = node._(key, { filename: name })
+        if (!deleted) {
+          const args = { filename: name }
+          const end = /[.!?]$/.test(text) ? "" : "."
+          text = `${text}${end} ${node._("downloadfile.info.download_left_empty", args)}`
+        }
+        RED.notify(notifyText(text), type)
+      })
+    }
+    // Write the download into the file chosen in the save dialog. The body is
+    // piped to disk as it arrives and is never held in memory. The runtime ends
+    // a failed download by destroying the connection, so the body stream errors,
+    // pipeTo() aborts the writable, and the save is reported as failed.
+    function saveToFile(node, handle, ticket) {
+      const request = adminRequest(
+        `node-red-contrib-downloadfile/download/${encodeURIComponent(ticket)}`
+      )
+      const name = safeLabel(handle.name)
+      let response = null
+      let writable = null
+      // Stays on screen until the save ends: a stream can run for hours.
+      const saving = RED.notify(
+        notifyText(node._("downloadfile.info.download_saving", { filename: name })),
+        { fixed: true }
+      )
+      const closeSaving = function () {
+        try {
+          saving.close()
+        } catch (_) {}
+      }
+      fetch(request.url, {
+        headers: request.headers,
+        cache: "no-store",
+        credentials: "same-origin",
+        // The route never redirects. A redirect comes from something in front
+        // of Node-RED, for example a proxy login page, and must not be written
+        // into the file.
+        redirect: "error",
+      })
+        .then(function (answer) {
+          response = answer
+          if (!answer.ok || !answer.body) {
+            throw new Error(`HTTP ${answer.status}`)
+          }
+          return handle.createWritable()
+        })
+        .then(function (stream) {
+          writable = stream
+          return response.body.pipeTo(stream)
+        })
+        .then(
+          function () {
+            closeSaving()
+            const msg = node._("downloadfile.info.download_saved", {
+              filename: name,
+            })
+            RED.notify(notifyText(msg), "success")
+          },
+          function () {
+            closeSaving()
+            discardSave(response, writable).then(function () {
+              const key = "downloadfile.info.download_save_failed"
+              notifyFailure(node, handle, key, "error")
+            })
+          }
+        )
+    }
     // Hand the file to the browser's own download manager, which writes it
-    // straight to disk. Not a fetch() into a Blob: the file can be gigabytes.
+    // straight to disk. Used when the browser cannot show a save dialog.
+    // Not a fetch() into a Blob: the file can be gigabytes.
     // An anchor with the `download` attribute never navigates the editor tab
     // away, so an error page cannot discard unsaved flow edits. The attribute is
     // empty, so the browser keeps the name the runtime sends.
