@@ -18,11 +18,39 @@
     },
     "label": {
       "encoding": "Encoding",
+      "errorProperty": "Error property",
       "filename": "File name",
-      "name": "Name"
+      "name": "Name",
+      "stream": "Stream: write all messages up to msg.complete into one file"
+    },
+    "info": {
+      "download_button": "Download",
+      "download_cancel_failed": "Could not cancel the download request",
+      "download_claimed": "Somebody else has already downloaded this file",
+      "download_dismiss": "Dismiss",
+      "download_expired": "This download request has expired and the file is gone",
+      "download_failed": "Could not start the download, please try again",
+      "download_ready": "File ready to download from \"__node__\": __filename__",
+      "download_ready_flow": "File ready to download from \"__node__\" in flow \"__flow__\": __filename__",
+      "download_ready_flow_noname": "File ready to download from \"__node__\" in flow \"__flow__\"",
+      "download_ready_noname": "File ready to download from \"__node__\""
+    },
+    "errors": {
+      "bad_payload": "A payload could not be turned into text: __error__",
+      "in_progress": "A download is already in progress on this node",
+      "no_editor": "The editor is not available, so a file download cannot be started",
+      "node_closed": "The node was stopped or redeployed, so the download was stopped",
+      "too_long": "The download passed its __minutes__ minute limit and was stopped",
+      "too_much_held": "Too much data arrived before the browser could take it. Turn on flow control in the source."
+    },
+    "status": {
+      "downloading": "downloading",
+      "error": "error",
+      "idle": "idle",
+      "waiting": "waiting for download"
     },
     "warn": {
-      "cannot_convert_to_string": "",
+      "cannot_convert_to_string": "Payload could not be converted to a string",
       "no_payload": "Message has no payload"
     }
   }

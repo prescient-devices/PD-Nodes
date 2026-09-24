@@ -6,6 +6,14 @@
        <label for="node-input-filename"><i class="fa fa-file"></i> <span data-i18n="downloadfile.label.filename"></span></label>
        <input id="node-input-filename" type="text">
   </div>
+  <div class="form-row">
+    <input type="checkbox" id="node-input-stream" style="display: inline-block; width: auto; vertical-align: top;" />
+    <label for="node-input-stream" style="width: auto" data-i18n="downloadfile.label.stream"></label>
+  </div>
+  <div class="form-row form-row-error-property">
+    <label for="node-input-errorProperty"><i class="fa fa-exclamation-triangle"></i> <span data-i18n="downloadfile.label.errorProperty"></span></label>
+    <input type="text" id="node-input-errorProperty" style="width: 250px;">
+  </div>
   <div class="form-row form-row-file-encoding">
       <label for="node-input-encoding"><i class="fa fa-flag"></i> <span data-i18n="downloadfile.label.encoding"></span></label>
       <select type="text" id="node-input-encoding" style="width: 250px;">
@@ -14,6 +22,9 @@
   <div class="form-row node-input-name">
     <label for="node-input-name"><i class="fa fa-tag" style="width: 20px;"></i><span data-i18n="downloadfile.label.name"></span></label>
     <input type="text" id="node-input-name" data-i18n="[placeholder]downloadfile.label.name" style="width: 339.19px;">
+  </div>
+  <div class="form-row" hidden>
+    <input type="number" id="node-input-outputs">
   </div>
 </script>
 
@@ -136,6 +147,269 @@
         "tis620",
       ],
     ]
+    // ---- Stream mode ---------------------------------------------------------
+    // How long the claim POST and the cancel POST are each given before they are
+    // abandoned.
+    const globalAdminTimeoutMs = 30 * 1000
+    // Every banner carries its own expiry. An editor that is offline when the
+    // runtime broadcasts the claimed or expired event never learns that the
+    // request is over. Matches the ten minutes the runtime waits for a click.
+    const globalDownloadExpiryMs = 10 * 60 * 1000
+    // Download id -> { node, notification, timer, claiming }. Object.create(null)
+    // because the key arrives over the comms channel, and "__proto__" is not a
+    // key at all on a plain object.
+    const globalDownloads = Object.create(null)
+    // A download id and a ticket are each 32 lowercase hex characters. Anything
+    // else is dropped before it reaches a URL or is used as a map key.
+    const globalHexIdRe = /^[0-9a-f]{32}$/
+    // Longest node label or file name shown in a banner.
+    const globalLabelMaxLen = 120
+    // Arming, claiming and expiry all arrive on this one topic prefix. It must not
+    // start with "DOWNLOAD-FILE", the prefix of the one-file-per-message mode.
+    const globalStreamSentinel = "notification/STREAM-DOWNLOAD-FILE-"
+    // Build a call to this node's own admin routes. The editor attaches admin-API
+    // credentials to jQuery requests from a global $.ajaxSetup prefilter; this
+    // repeats that contract so the URL is also usable for a navigation.
+    function adminRequest(path) {
+      const settings = (typeof RED === "object" && RED && RED.settings) || null
+      const root = (settings && settings.apiRootUrl) || ""
+      const headers = { "Node-RED-API-Version": "v2" }
+      let tokens = null
+      try {
+        // get() reads localStorage, which a browser can refuse.
+        tokens = settings && settings.get ? settings.get("auth-tokens") : null
+      } catch (_) {}
+      if (tokens && tokens.access_token) {
+        headers.Authorization = `Bearer ${tokens.access_token}`
+      }
+      return { url: root + path, headers }
+    }
+    // Take the file for this browser and then save it. Two steps, because the
+    // download itself is a navigation, and a navigation cannot carry the
+    // Authorization header. This POST carries it and passes the permission
+    // check, and it answers with a one-time ticket the download route accepts.
+    function claimDownload(downloadId) {
+      const entry = globalDownloads[downloadId]
+      if (!entry || entry.claiming) {
+        return
+      }
+      entry.claiming = true
+      const node = entry.node
+      const request = adminRequest(
+        `node-red-contrib-downloadfile/claim/${encodeURIComponent(downloadId)}`
+      )
+      $.ajax({
+        type: "POST",
+        url: request.url,
+        headers: Object.assign({ Accept: "application/json" }, request.headers),
+        dataType: "json",
+        timeout: globalAdminTimeoutMs,
+        success: function (data) {
+          const ticket = (data || {}).ticket
+          if (typeof ticket !== "string" || !globalHexIdRe.test(ticket)) {
+            entry.claiming = false
+            RED.notify(notifyText(node._("downloadfile.info.download_failed")), "error")
+            return
+          }
+          clearDownload(downloadId, false)
+          saveDownload(ticket)
+        },
+        error: function (jqXHR) {
+          if (jqXHR.status === 409) {
+            // Somebody else clicked first.
+            clearDownload(downloadId, false)
+            RED.notify(notifyText(node._("downloadfile.info.download_claimed")))
+            return
+          }
+          if (jqXHR.status === 404) {
+            // The ten minutes ran out and the runtime has dropped the download.
+            clearDownload(downloadId, false)
+            RED.notify(notifyText(node._("downloadfile.info.download_expired")))
+            return
+          }
+          // Anything else may work on a second attempt, so the banner stays.
+          entry.claiming = false
+          RED.notify(notifyText(node._("downloadfile.info.download_failed")), "error")
+        },
+      })
+    }
+    // Take a banner down and stop its expiry timer. When `cancel` is set, tell
+    // the runtime that nobody is coming for the file, so it releases the stream.
+    function clearDownload(downloadId, cancel) {
+      const entry = globalDownloads[downloadId]
+      if (!entry) {
+        return
+      }
+      delete globalDownloads[downloadId]
+      window.clearTimeout(entry.timer)
+      if (entry.notification) {
+        entry.notification.close()
+      }
+      if (!cancel) {
+        return
+      }
+      const request = adminRequest(
+        `node-red-contrib-downloadfile/cancel/${encodeURIComponent(downloadId)}`
+      )
+      $.ajax({
+        type: "POST",
+        url: request.url,
+        headers: Object.assign({ Accept: "application/json" }, request.headers),
+        timeout: globalAdminTimeoutMs,
+        error: function (jqXHR) {
+          if (jqXHR.status === 404 || jqXHR.status === 409) {
+            return
+          }
+          const msg = entry.node._("downloadfile.info.download_cancel_failed")
+          RED.notify(notifyText(msg), "error")
+        },
+      })
+    }
+    // RED.notify() puts a string argument straight into innerHTML, and a node
+    // name or file name inside a catalogue string arrives raw. A text node takes
+    // the append branch, which cannot inject markup. Button labels reach
+    // innerHTML too, so they may only ever be literal catalogue strings.
+    function notifyText(msg) {
+      return $("<p>").text(msg)
+    }
+    // Delete the invisible and direction-altering characters that could make a
+    // banner read as something it does not say, and bound the length. The list
+    // is the same one sanitizeFilename() in downloadfile-stream_core.js deletes;
+    // change both together.
+    function safeLabel(arg) {
+      const raw = String(arg === null || arg === undefined ? "" : arg)
+      const chars = []
+      for (const ch of raw) {
+        const code = ch.codePointAt(0)
+        if (
+          code < 0x20 ||
+          (code >= 0x7f && code <= 0x9f) ||
+          code === 0x00ad ||
+          code === 0x061c ||
+          code === 0x180e ||
+          (code >= 0x200b && code <= 0x200f) ||
+          (code >= 0x2028 && code <= 0x2029) ||
+          (code >= 0x202a && code <= 0x202e) ||
+          (code >= 0x2060 && code <= 0x2064) ||
+          (code >= 0x2066 && code <= 0x2069) ||
+          (code >= 0xd800 && code <= 0xdfff) ||
+          code === 0xfeff ||
+          (code >= 0xe0000 && code <= 0xe007f)
+        ) {
+          continue
+        }
+        chars.push(ch)
+      }
+      const text =
+        chars.length > globalLabelMaxLen
+          ? `${chars.slice(0, globalLabelMaxLen).join("")}...`
+          : chars.join("")
+      if (!text) {
+        return ""
+      }
+      // A first-strong isolate, so right-to-left text in a name cannot reorder
+      // the rest of the sentence.
+      return `${String.fromCodePoint(0x2066)}${text}${String.fromCodePoint(0x2069)}`
+    }
+    // Put a banner on screen for a download the runtime is holding.
+    function showDownloadBanner(node, downloadId, filename) {
+      if (globalDownloads[downloadId]) {
+        return
+      }
+      const label = safeLabel(RED.utils.getNodeLabel(node, node.type))
+      const name = safeLabel(filename)
+      const container = RED.nodes.workspace(node.z) || RED.nodes.subflow(node.z)
+      const flow = container ? safeLabel(container.label || container.name) : ""
+      const key = `downloadfile.info.download_ready${flow ? "_flow" : ""}${
+        name ? "" : "_noname"
+      }`
+      const text = node._(key, { node: label, flow, filename: name })
+      const entry = { node, notification: null, timer: null, claiming: false }
+      globalDownloads[downloadId] = entry
+      entry.timer = window.setTimeout(function () {
+        clearDownload(downloadId, false)
+      }, globalDownloadExpiryMs)
+      entry.notification = RED.notify(notifyText(text), {
+        fixed: true,
+        buttons: [
+          {
+            text: node._("downloadfile.info.download_button"),
+            class: "primary",
+            click: function () {
+              claimDownload(downloadId)
+            },
+          },
+          {
+            text: node._("downloadfile.info.download_dismiss"),
+            click: function () {
+              clearDownload(downloadId, true)
+            },
+          },
+        ],
+      })
+    }
+    // Hand the file to the browser's own download manager, which writes it
+    // straight to disk. Not a fetch() into a Blob: the file can be gigabytes.
+    // An anchor with the `download` attribute never navigates the editor tab
+    // away, so an error page cannot discard unsaved flow edits. The attribute is
+    // empty, so the browser keeps the name the runtime sends.
+    function saveDownload(ticket) {
+      const request = adminRequest(
+        `node-red-contrib-downloadfile/download/${encodeURIComponent(ticket)}`
+      )
+      const anchor = document.createElement("a")
+      anchor.href = request.url
+      anchor.download = ""
+      anchor.rel = "noopener"
+      anchor.style.display = "none"
+      // Firefox acts on a synthetic click only for an anchor in the document.
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+    }
+    // A Stream mode download raises a runtime event. It must not start the
+    // download itself: a download with no user click before it counts against
+    // Chrome's per-tab limit. A banner asks for the click instead. Registered
+    // here, not in oneditprepare(), because the banner must show whether or not
+    // the node's edit dialog is open.
+    RED.comms.subscribe("notification/#", function (topic, payload) {
+      if (!topic.startsWith(globalStreamSentinel)) {
+        return
+      }
+      const { downloadId, filename, claimed, expired } = payload || {}
+      if (typeof downloadId !== "string" || !globalHexIdRe.test(downloadId)) {
+        return
+      }
+      if (claimed || expired) {
+        // Somebody took the file, or the runtime stopped holding it.
+        clearDownload(downloadId, false)
+        return
+      }
+      // A session that cannot pass the claim's permission check would only be
+      // shown a button that fails.
+      if (!RED.user.hasPermission("downloadfile.read")) {
+        return
+      }
+      const id = topic.slice(globalStreamSentinel.length).trim()
+      const node = RED.nodes.node(id)
+      if (!node || node.type !== "downloadfile") {
+        return
+      }
+      showDownloadBanner(node, downloadId, filename)
+    })
+    // A node deleted while its download is on offer would leave a banner the user
+    // can no longer place.
+    RED.events.on("nodes:remove", function (node) {
+      if (!node || !node.id) {
+        return
+      }
+      Object.keys(globalDownloads).forEach(function (downloadId) {
+        if (globalDownloads[downloadId].node.id === node.id) {
+          clearDownload(downloadId, false)
+        }
+      })
+    })
+    // ---- One file per message (Stream off) -----------------------------------
     RED.comms.subscribe("notification/#", function (topic, payload) {
       if (topic.startsWith("notification/DOWNLOAD-FILE")) {
         const fname = payload.filename || ""
@@ -159,6 +433,26 @@
         name: { value: "" },
         filename: { value: "" },
         encoding: { value: "none" },
+        stream: { value: false },
+        // Stream mode only: the msg property whose truthy value on the final
+        // message fails the download. A config written by hand can lack the key,
+        // which stays valid; the runtime then reads msg.error.
+        errorProperty: {
+          value: "error",
+          validate: function (v) {
+            if (v === undefined) {
+              return true
+            }
+            return (
+              typeof v === "string" &&
+              v !== "" &&
+              RED.utils.validatePropertyExpression(v)
+            )
+          },
+        },
+        // One output in Stream mode, none otherwise. Kept in step with the
+        // checkbox by oneditprepare(), through the hidden node-input-outputs.
+        outputs: { value: 0 },
       },
       inputs: 1,
       outputs: 0,
@@ -176,11 +470,12 @@
         })
           .text(label)
           .appendTo(encSel)
+        let setByMsgLabel = node._("downloadfile.encoding.setbymsg")
         $("<option/>", {
           value: "setbymsg",
-          label: node._("downloadfile.encoding.setbymsg"),
+          label: setByMsgLabel,
         })
-          .text(label)
+          .text(setByMsgLabel)
           .appendTo(encSel)
         globalEncodings.forEach(function (item) {
           if (Array.isArray(item)) {
@@ -206,6 +501,27 @@
           }
         })
         encSel.val(node.encoding)
+        // A node saved before Stream mode existed has no errorProperty, and the
+        // editor shows it as "". Saved as "", it would fail validation and never
+        // fail a download, so show the default instead.
+        if (!$("#node-input-errorProperty").val()) {
+          $("#node-input-errorProperty").val("error")
+        }
+        $("#node-input-errorProperty").typedInput({
+          default: "msg",
+          types: ["msg"],
+        })
+        // Stream mode writes strings as UTF-8 and ignores the encoding, so the
+        // encoding row is hidden while Stream is on. The error property is read
+        // in Stream mode only, so its row shows only while Stream is on.
+        function updateStream() {
+          const streaming = $("#node-input-stream").is(":checked")
+          $(".form-row-file-encoding")[streaming ? "hide" : "show"]()
+          $(".form-row-error-property")[streaming ? "show" : "hide"]()
+          $("#node-input-outputs").val(streaming ? 1 : 0)
+        }
+        $("#node-input-stream").on("change", updateStream)
+        updateStream()
       },
     })
   })()

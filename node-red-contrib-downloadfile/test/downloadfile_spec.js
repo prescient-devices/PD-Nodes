@@ -125,7 +125,7 @@ describe("node-red-contrib-downloadfile", function () {
         { fname: globalExampleFileName },
         { topic: "a" }
       )
-      act.should.eql("warn.no_payload")
+      act.should.eql("downloadfile.warn.no_payload")
     })
     it("Cannot convert payload to string", async function () {
       const act = await testNodeWarning(
@@ -134,7 +134,7 @@ describe("node-red-contrib-downloadfile", function () {
           payload: BigInt(1),
         }
       )
-      act.should.eql("warn.cannot_convert_to_string")
+      act.should.eql("downloadfile.warn.cannot_convert_to_string")
     })
   })
   describe("Browser tests", function () {

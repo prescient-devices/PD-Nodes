@@ -2,18 +2,142 @@
   Copyright 2022-Present Prescient Devices, Inc.
 -->
 <script type="text/html" data-help-name="downloadfile">
-    <p>Writes <code>msg.payload</code> to a file in the browser's file system.
-    If <code>msg.payload</code> is a buffer it is treated as binary data,
-    otherwise if <code>msg.payload</code> is not a string it is converted to one
-    with the <code>JSON.stringify</code> function. The encoding options is used
-    for string and string-converted payloads.
+    <p>Saves message payloads to a file in the browser's download folder.</p>
+    <p>The node has two modes. With <b>Stream</b> off, each message becomes its own
+    file. With <b>Stream</b> on, a whole stream of messages becomes one file.</p>
+
+    <h3>Stream off</h3>
+    <p>Each message is sent to every open editor, and each editor saves it as a file.
+    If <code>msg.payload</code> is a Buffer, the file gets its bytes as binary data.
+    If <code>msg.payload</code> is not a string or a Buffer, the node converts it with
+    <code>JSON.stringify</code>. The Encoding setting applies to string and converted
+    payloads. Browsers may block the second and later automatic downloads. Use Stream
+    mode for large or repeated data.</p>
+
+    <h3>Stream on</h3>
+    <p>A stream is every message from the first one up to the one with
+    <code>msg.complete</code> set to <code>true</code>. The node writes the payloads
+    of all these messages into one file, in order. It does not hold the whole file in
+    memory, so the file can be many gigabytes.</p>
+    <p>A string payload is written as UTF-8 text. A Buffer is written as it is. Any
+    other payload is written as JSON followed by a new line. The Encoding setting has
+    no effect in this mode.</p>
+    <p>When the first message arrives, every open editor shows a banner with a
+    <b>Download</b> button. Somebody must click <b>Download</b> within 10 minutes.
+    If nobody clicks, the download expires. <b>Dismiss</b> cancels it.</p>
+    <p>The file goes to the download folder of the browser where somebody clicked.
+    The node cannot choose the folder.</p>
+    <p>A node works on one stream at a time. The node tells streams apart by
+    <code>msg._streamID</code>. Put the same <code>_streamID</code> on every message
+    of a stream, the final message included. A final message with a
+    <code>_streamID</code> ends only the stream with that id.</p>
+    <p>When a second stream reaches the node while a download is open, the node
+    refuses it. Each of its messages goes straight on with state <code>error</code>,
+    and nothing of it is written. This goes on until its final message, even after
+    the first download ends. The node warns once for each refused stream.</p>
+    <p>A message without <code>msg._streamID</code> joins any download that is open
+    on the node, and its final message ends that download. So when two sources can
+    reach one node at the same time, give every message of each stream a
+    <code>_streamID</code>. That includes a stream with no data, which is only a
+    final message.</p>
+
+    <h3>Flow control</h3>
+    <p>The node sends a message on only after its payload is written to the browser.
+    A source that waits for each output message before it sends the next one moves
+    only as fast as the browser saves the file. To do this, connect this node's output
+    to the node that tells your source to send its next message.</p>
+    <p>Without flow control, messages can arrive faster than the browser takes them.
+    The node holds them in order, up to 16 MiB of <code>msg.payload</code> or 10,000
+    messages. Past either limit, it stops the download with an error. The 16 MiB
+    counts <code>msg.payload</code> only. Delete other large message properties
+    before this node.</p>
+    <p>A source that waits for each output message waits from the first message until
+    somebody clicks Download. If the source has its own time limit, for example a
+    database connection timeout, make that limit longer than the time people need to
+    click.</p>
+    <p>A source can pack many lines into one message. This node writes each payload
+    as it comes. It adds nothing between string payloads.</p>
+    <p><b>Error property</b> is a message property, shown only with Stream on. The
+    default is <code>msg.error</code>. When the source fails part way through, it can
+    end the stream with <code>msg.complete</code> set to <code>true</code> and a
+    truthy value at this property. This node then stops the download with state
+    <code>error</code>, and the browser marks the file as failed. The value becomes
+    the error text. So a failed source never gives a short file marked as done. The
+    node reads this property on the final message only.</p>
 
     <h3>Inputs</h3>
-
     <dl class="message-properties">
+        <dt>payload <span class="property-type">string | Buffer | any</span></dt>
+        <dd>The data to write.</dd>
         <dt class="optional">filename <span class="property-type">string</span></dt>
-        <dd>If not configured in the node, this optional property sets the name of the file to use.</dd>
+        <dd>The name of the file. It overrides the name set in the node. In Stream
+        mode, only the first message of a stream sets the name. The node deletes
+        characters that are not safe in a file name. If the name has no extension,
+        the node adds <code>.txt</code>. The default name is <code>data.txt</code>.</dd>
         <dt class="optional">encoding <span class="property-type">string</span></dt>
-        <dd>If encoding is configured to be set by msg, then this optional property can set the encoding.</dt>
+        <dd>Stream off only. If the node's Encoding is "set by msg.encoding", this
+        property sets the encoding.</dd>
+        <dt class="optional">complete <span class="property-type">boolean</span></dt>
+        <dd>Stream on only. <code>true</code> marks the last message of a stream. The
+        node writes its payload, then ends the file.</dd>
     </dl>
+
+    <h3>Outputs</h3>
+    <p>Stream on only. The node has one output.</p>
+    <dl class="message-properties">
+        <dt>download <span class="property-type">object</span></dt>
+        <dd>Every output message carries <code>msg.download</code>, with these
+        properties:
+        <ul>
+            <li><code>state</code>: <code>streaming</code> while the file is being
+            written, then one of <code>done</code>, <code>expired</code>,
+            <code>cancelled</code> or <code>error</code>. The node status can also
+            show <code>waiting</code> (nobody has clicked yet) and
+            <code>claimed</code> (somebody clicked).</li>
+            <li><code>filename</code>: the file name the browser gets.</li>
+            <li><code>bytes</code>: the bytes written so far.</li>
+            <li><code>messages</code>: the messages written so far.</li>
+            <li><code>elapsedMs</code>: milliseconds since the first message.</li>
+            <li><code>error</code>: <code>false</code>, or the error text when the
+            state is <code>error</code>.</li>
+        </ul></dd>
+        <dt>complete <span class="property-type">boolean</span></dt>
+        <dd>Set on the last message of a download. When the file is done, this is the
+        input message that carried <code>msg.complete</code>. After a download stops
+        early, see below.</dd>
+    </dl>
+
+    <h3>When a download stops early</h3>
+    <p>A download stops early in these cases:</p>
+    <ul>
+        <li>Nobody clicks Download within 10 minutes.</li>
+        <li>Somebody clicks Dismiss before anybody clicks Download.</li>
+        <li>The browser stops the download.</li>
+        <li>No byte moves on the download connection for 15 minutes.</li>
+        <li>The download runs for more than 4 hours.</li>
+        <li>More than 16 MiB or 10,000 messages are waiting.</li>
+        <li>The source ends the stream with a truthy value at the Error property.</li>
+        <li>The node is redeployed.</li>
+    </ul>
+    <p>The browser then marks the file as failed. The node sends each held message
+    straight on, without writing it. Then it sends exactly one message of its own with
+    the state and <code>msg.complete</code> set to <code>true</code>. When the
+    source's final message is already held, that message is the one, and it goes out
+    last. Otherwise the node's message has an empty payload and no
+    <code>_streamID</code>. The rest of the stream then also goes straight on, so the
+    source can finish, and the source's own final message comes out later with its
+    <code>msg.complete</code>.</p>
+    <p>A redeploy of this node during a stream stops the download. Node-RED drops
+    messages sent to a node while it restarts, so a source that waits for each output
+    message can wait forever. Give such a source a time limit of its own. If later
+    messages of that stream reach the new node, it passes them on and does not open a
+    second download.</p>
+    <p>If no message of that stream arrives for 10 minutes, the node stops waiting
+    for <code>msg.complete</code> and returns to idle. The next message then starts a
+    new stream.</p>
+    <p>Stream mode needs somebody to open the Node-RED editor and click
+    <b>Download</b>, because the download goes through the editor's admin HTTP
+    server. With the editor turned off (<code>httpAdminRoot: false</code> or
+    <code>disableEditor: true</code>), nobody can click, so the download expires
+    after 10 minutes.</p>
 </script>

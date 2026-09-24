@@ -1,7 +1,14 @@
 {
   "name": "@prescient-devices-oss/node-red-contrib-downloadfile",
-  "version": "1.1.1",
-  "description": "Opens web browser file save dialog and saves the payload received to a file in the local filesystem",
+  "version": "1.2.0",
+  "description": "Saves message payloads as a file in the browser, one file per message or one file per stream of messages",
+  "files": [
+    "downloadfile.js",
+    "downloadfile-stream_core.js",
+    "downloadfile.html",
+    "locales/",
+    "examples/"
+  ],
   "scripts": {
     "test": "mocha --bail --full-warning --full-trace --timeout $((60*1000)) \"test/**/*_spec.js\""
   },
@@ -15,7 +22,9 @@
   },
   "keywords": [
     "node-red",
-    "download"
+    "download",
+    "file",
+    "stream"
   ],
   "bugs": {
     "url": "https://github.com/prescient-devices/PD-Nodes/issues"
@@ -26,12 +35,14 @@
   "devDependencies": {
     "chai": "^4.3.10",
     "clone": "^2.1.2",
+    "express": "^4.22.3",
     "jshint": "^2.13.6",
     "mocha": "^10.2.0",
     "node-netstat": "^1.8.0",
     "node-red": "^3.1.0",
     "node-red-node-test-helper": "^0.3.2",
     "prettier": "^3.0.3",
-    "puppeteer": "^21.3.8"
+    "puppeteer": "^21.3.8",
+    "sinon": "^9.2.4"
   }
 }
